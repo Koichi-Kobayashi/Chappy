@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Chappy.Wpf.Controls.Test/Chappy.Wpf.Controls.Test.csproj" />
+  <Project Path="Chappy.Wpf.Controls/Chappy.Wpf.Controls.csproj" />
+</Solution>
