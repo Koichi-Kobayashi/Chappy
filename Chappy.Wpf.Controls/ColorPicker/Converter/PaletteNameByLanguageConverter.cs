@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using Chappy.Wpf.Controls.ColorPicker;
 
-namespace Chappy.Wpf.Controls.Converter
+namespace Chappy.Wpf.Controls.ColorPicker.Converter
 {
     /// <summary>
     /// values[0] = PaletteColor

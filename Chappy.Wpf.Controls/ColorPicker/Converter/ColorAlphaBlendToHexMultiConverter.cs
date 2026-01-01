@@ -3,7 +3,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using Chappy.Wpf.Controls.Uitl;
 
-namespace Chappy.Wpf.Controls.Converter
+namespace Chappy.Wpf.Controls.ColorPicker.Converter
 {
     /// <summary>
     /// values[0] : SelectedColor (Color)

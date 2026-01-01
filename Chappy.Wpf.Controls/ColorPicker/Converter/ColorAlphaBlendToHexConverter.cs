@@ -2,7 +2,7 @@
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace Chappy.Wpf.Controls.Converter
+namespace Chappy.Wpf.Controls.ColorPicker.Converter
 {
     public sealed class ColorAlphaBlendToHexConverter : IValueConverter
     {

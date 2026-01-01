@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using Chappy.Wpf.Controls.ColorPicker;
 
-namespace Chappy.Wpf.Controls.Converter
+namespace Chappy.Wpf.Controls.ColorPicker.Converter
 {
     // values[0] = PaletteColor
     // values[1] = ToolTipLanguage ("ja"/"en")

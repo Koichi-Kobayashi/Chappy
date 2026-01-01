@@ -2,7 +2,7 @@
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace Chappy.Wpf.Controls.Converter
+namespace Chappy.Wpf.Controls.ColorPicker.Converter
 {
     /// <summary>
     /// SelectedColor を指定した背景色と Alpha Blend した結果の Color を返す
