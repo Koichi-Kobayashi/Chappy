@@ -5,7 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 
-namespace Chappy.Wpf.Controls;
+namespace Chappy.Wpf.Controls.ContextMenu;
 
 public class ShellContextMenuDataGrid : DataGrid
 {

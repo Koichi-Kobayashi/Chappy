@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Markup;
 
 [assembly: ThemeInfo(
     ResourceDictionaryLocation.None,            //where theme specific resource dictionaries are located
@@ -8,3 +9,19 @@ using System.Windows;
                                                 //(used if a resource is not found in the page,
                                                 // app, or any theme specific resource dictionaries)
 )]
+
+
+// 1Ç¬ÇÃ xmlns Ç…èWñÒ
+[assembly: XmlnsDefinition(
+    "http://schemas.chappy.dev/wpf/controls",
+    "Chappy.Wpf.Controls.ColorPicker")]
+
+[assembly: XmlnsDefinition(
+    "http://schemas.chappy.dev/wpf/controls",
+    "Chappy.Wpf.Controls.ContextMenu")]
+
+// êÑèßÅFXAML Ç≈ÇÃä˘íË prefix
+[assembly: XmlnsPrefix(
+    "http://schemas.chappy.dev/wpf/controls",
+    "chappy")]
+

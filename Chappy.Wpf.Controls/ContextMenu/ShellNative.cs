@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Chappy.Wpf.Controls;
+namespace Chappy.Wpf.Controls.ContextMenu;
 
 internal static class ShellNative
 {

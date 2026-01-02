@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace Chappy.Wpf.Controls;
+namespace Chappy.Wpf.Controls.ContextMenu;
 
 public sealed class ShellContextMenuHost : IDisposable
 {
