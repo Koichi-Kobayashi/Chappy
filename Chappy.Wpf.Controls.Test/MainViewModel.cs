@@ -10,13 +10,15 @@ namespace Chappy.Wpf.Controls.Test
             Items.Add(new FileEntry
             {
                 Name = "新規 テキスト ドキュメント.txt",
-                FullPath = @"C:\Users\kobayashi\Downloads\",
+                FullPath = @"C:\Users\kobayashi\Downloads\新規 テキスト ドキュメント.txt",
+                CurrentFolder = @"C:\Users\kobayashi\Downloads",
                 Kind = EntryKind.File
             });
             Items.Add(new FileEntry
             {
                 Name = "abc",
                 FullPath = @"C:\Users\kobayashi\Downloads\abc",
+                CurrentFolder = @"C:\Users\kobayashi\Downloads\abc",
                 Kind = EntryKind.Folder
             });
         }

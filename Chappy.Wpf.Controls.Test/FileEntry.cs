@@ -12,6 +12,7 @@ public class FileEntry : INotifyPropertyChanged
 {
     public string Name { get; set; } = "";
     public string FullPath { get; set; } = "";
+    public string CurrentFolder { get; set; } = "";
     public EntryKind Kind { get; set; } // File / Folder
 
     public event PropertyChangedEventHandler? PropertyChanged;

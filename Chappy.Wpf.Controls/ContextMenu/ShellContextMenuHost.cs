@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
-namespace Chappy.Wpf.Controls.ContextMenu;
+namespace Chappy.Wpf.Controls;
 
 public sealed class ShellContextMenuHost : IDisposable
 {
@@ -103,6 +103,115 @@ public sealed class ShellContextMenuHost : IDisposable
         finally
         {
             Native.CoTaskMemFree(pidlFull);
+        }
+    }
+
+    public void ShowForItems(IReadOnlyList<string> paths, Point screenPoint)
+    {
+        if (paths == null || paths.Count == 0) return;
+
+        // 「存在するパス」だけに絞る（安全）
+        var valid = new List<string>(paths.Count);
+        foreach (var p in paths)
+        {
+            if (string.IsNullOrWhiteSpace(p)) continue;
+            if (System.IO.File.Exists(p) || System.IO.Directory.Exists(p))
+                valid.Add(p);
+        }
+        if (valid.Count == 0) return;
+
+        // Explorer同様：同一フォルダ内の複数選択が基本
+        // もし混在してたら、最初のフォルダ分だけに寄せる（現実解）
+        var baseDir = System.IO.Path.GetDirectoryName(valid[0]) ?? "";
+        valid = valid.Where(p => string.Equals(System.IO.Path.GetDirectoryName(p) ?? "", baseDir, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (valid.Count == 0) return;
+
+        CleanupCom();
+
+        IntPtr hwndOwner = _source.Handle;
+        if (hwndOwner == IntPtr.Zero) return;
+
+        // full PIDL を全部確保して最後に解放する
+        var pidlFullList = new List<IntPtr>(valid.Count);
+
+        try
+        {
+            // 1つ目から親フォルダ(IShellFolder)と childPIDL を取得
+            int hr = Native.SHParseDisplayName(valid[0], IntPtr.Zero, out var pidl0, 0, out _);
+            if (hr != Native.S_OK || pidl0 == IntPtr.Zero) return;
+            pidlFullList.Add(pidl0);
+
+            hr = Native.SHBindToParent(pidl0, in Native.IID_IShellFolder, out var ppvParent, out var pidlChild0);
+            if (hr != Native.S_OK || ppvParent == IntPtr.Zero || pidlChild0 == IntPtr.Zero) return;
+
+            IShellFolder parentFolder;
+            try { parentFolder = (IShellFolder)Marshal.GetObjectForIUnknown(ppvParent); }
+            finally { Marshal.Release(ppvParent); }
+
+            // childPIDL配列を作る（pidlChild は full pidl の内部を指すので解放不要）
+            var childPidls = new List<IntPtr>(valid.Count) { pidlChild0 };
+
+            // 2つ目以降：同じ親フォルダか確認しつつ childPIDL を集める
+            for (int i = 1; i < valid.Count; i++)
+            {
+                hr = Native.SHParseDisplayName(valid[i], IntPtr.Zero, out var pidl, 0, out _);
+                if (hr != Native.S_OK || pidl == IntPtr.Zero) continue;
+
+                pidlFullList.Add(pidl);
+
+                hr = Native.SHBindToParent(pidl, in Native.IID_IShellFolder, out var ppvParentI, out var pidlChildI);
+                if (hr != Native.S_OK || ppvParentI == IntPtr.Zero || pidlChildI == IntPtr.Zero)
+                    continue;
+
+                // 同一フォルダ前提なので、親のCOMは捨てる（最初の parentFolder を使う）
+                Marshal.Release(ppvParentI);
+
+                childPidls.Add(pidlChildI);
+            }
+
+            if (childPidls.Count == 0) return;
+
+            // 親フォルダから IContextMenu を取得（複数 = childPIDL配列）
+            Guid iid = Native.IID_IContextMenu;
+            hr = parentFolder.GetUIObjectOf(hwndOwner, (uint)childPidls.Count, childPidls.ToArray(), ref iid, IntPtr.Zero, out var ppvMenu);
+            if (hr != Native.S_OK || ppvMenu == IntPtr.Zero) return;
+
+            try { _cm = (IContextMenu)Marshal.GetObjectForIUnknown(ppvMenu); }
+            finally { Marshal.Release(ppvMenu); }
+
+            _cm2 = _cm as IContextMenu2;
+            _cm3 = _cm as IContextMenu3;
+
+            IntPtr hMenu = Native.CreatePopupMenu();
+            if (hMenu == IntPtr.Zero) return;
+
+            try
+            {
+                _cm.QueryContextMenu(hMenu, 0, IdCmdFirst, IdCmdLast, Native.CMF_NORMAL);
+
+                int cmd = Native.TrackPopupMenuEx(
+                    hMenu,
+                    Native.TPM_RETURNCMD | Native.TPM_RIGHTBUTTON,
+                    (int)screenPoint.X,
+                    (int)screenPoint.Y,
+                    hwndOwner,
+                    IntPtr.Zero);
+
+                if (cmd > 0)
+                    InvokeCommand(hwndOwner, cmd);
+            }
+            finally
+            {
+                Native.DestroyMenu(hMenu);
+            }
+        }
+        finally
+        {
+            // full PIDL は全部解放
+            foreach (var pidl in pidlFullList)
+            {
+                if (pidl != IntPtr.Zero) Native.CoTaskMemFree(pidl);
+            }
         }
     }
 

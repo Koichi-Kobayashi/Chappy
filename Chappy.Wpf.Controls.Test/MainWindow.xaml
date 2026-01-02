@@ -2,8 +2,8 @@
     x:Class="Chappy.Wpf.Controls.Test.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:cm="clr-namespace:Chappy.Wpf.Controls.ContextMenu;assembly=Chappy.Wpf.Controls"
-    xmlns:controls="clr-namespace:Chappy.Wpf.Controls.ColorPicker;assembly=Chappy.Wpf.Controls"
+    xmlns:cm="clr-namespace:Chappy.Wpf.Controls.ColorPicker;assembly=Chappy.Wpf.Controls"
+    xmlns:cm2="clr-namespace:Chappy.Wpf.Controls;assembly=Chappy.Wpf.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="clr-namespace:Chappy.Wpf.Controls.Test"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -25,23 +25,13 @@
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <controls:ColorPicker SelectedColor="{Binding MyColor}" ToolTipLanguage="en" />
 
-        <DataGrid
-            x:Name="FileGrid"
+        <cm:ColorPicker SelectedColor="{Binding MyColor}" ToolTipLanguage="en" />
+
+        <cm2:ShellContextMenuDataGrid
             Grid.Column="1"
-            PreviewMouseRightButtonDown="FileGrid_PreviewMouseRightButtonDown"
             ItemsSource="{Binding Items}"
-            SelectedItem="{Binding SelectedItem}">
-
-            <!--  行右クリック用  -->
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <!--  右クリックしたら行を選択しておく（重要）  -->
-                    <EventSetter Event="PreviewMouseRightButtonDown" Handler="Row_PreviewMouseRightButtonDown" />
-                </Style>
-            </DataGrid.RowStyle>
-        </DataGrid>
+            PathPropertyName="FullPath" />
 
     </Grid>
 </Window>

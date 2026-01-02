@@ -1,7 +1,6 @@
-﻿using System;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace Chappy.Wpf.Controls.ContextMenu;
+namespace Chappy.Wpf.Controls;
 
 [ComImport, InterfaceType(ComInterfaceType.InterfaceIsIUnknown),
  Guid("000214e4-0000-0000-c000-000000000046")]
