@@ -29,6 +29,7 @@
 
         <chappy:ShellContextMenuDataGrid
             Grid.Column="1"
+            CurrentFolderPath="{Binding CurrentFolderPathIfYouHaveIt}"
             ItemsSource="{Binding Items}"
             PathPropertyName="FullPath" />
 

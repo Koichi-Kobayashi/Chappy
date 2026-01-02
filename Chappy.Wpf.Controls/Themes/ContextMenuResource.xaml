@@ -1,9 +1,131 @@
 ﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="clr-namespace:Chappy.Wpf.Controls.ContextMenu">
+    xmlns:cm="clr-namespace:Chappy.Wpf.Controls.ContextMenu">
+
+    <!--  ===== Win11-like Brushes =====  -->
+    <SolidColorBrush x:Key="Win11.Menu.Background" Color="#F7F7F7" />
+    <SolidColorBrush x:Key="Win11.Menu.Border" Color="#22000000" />
+    <SolidColorBrush x:Key="Win11.Menu.Hover" Color="#12000000" />
+    <SolidColorBrush x:Key="Win11.Menu.Separator" Color="#14000000" />
+    <SolidColorBrush x:Key="Win11.Menu.Text" Color="#FF111111" />
+    <SolidColorBrush x:Key="Win11.Menu.SubtleText" Color="#7F000000" />
 
     <!--  ShellContextMenuDataGrid は “普通の DataGrid の見た目” を継承  -->
-    <Style BasedOn="{StaticResource {x:Type DataGrid}}" TargetType="{x:Type local:ShellContextMenuDataGrid}" />
+    <Style BasedOn="{StaticResource {x:Type DataGrid}}" TargetType="{x:Type cm:ShellContextMenuDataGrid}" />
 
+    <!--  ===== Local button style (影響を局所化) =====  -->
+    <Style x:Key="Win11.MenuButton" TargetType="{x:Type Button}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border
+                        x:Name="bd"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="8">
+                        <ContentPresenter Margin="{TemplateBinding Padding}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="{StaticResource Win11.Menu.Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bd" Property="Background" Value="#22000000" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--  ===== Win11ContextMenuView (implicit style) =====  -->
+    <Style TargetType="{x:Type cm:Win11ContextMenuView}">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type cm:Win11ContextMenuView}">
+                    <Border
+                        x:Name="PART_Chrome"
+                        Background="{StaticResource Win11.Menu.Background}"
+                        BorderBrush="{StaticResource Win11.Menu.Border}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="18" Opacity="0.18" />
+                        </Border.Effect>
+
+                        <StackPanel Margin="10">
+
+                            <!--  上段：アイコン列（簡易版：文字アイコン）  -->
+                            <UniformGrid Margin="0,0,0,10" Columns="4">
+                                <Button
+                                    Command="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=CutCommand}"
+                                    Style="{StaticResource Win11.MenuButton}"
+                                    ToolTip="切り取り">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        FontSize="14"
+                                        Text="✂" />
+                                </Button>
+                                <Button
+                                    Command="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=CopyCommand}"
+                                    Style="{StaticResource Win11.MenuButton}"
+                                    ToolTip="コピー">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        FontSize="14"
+                                        Text="⧉" />
+                                </Button>
+                                <Button
+                                    Command="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=DeleteCommand}"
+                                    Style="{StaticResource Win11.MenuButton}"
+                                    ToolTip="削除">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        FontSize="14"
+                                        Text="🗑" />
+                                </Button>
+                                <Button
+                                    Command="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=PropertiesCommand}"
+                                    Style="{StaticResource Win11.MenuButton}"
+                                    ToolTip="プロパティ">
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        FontSize="14"
+                                        Text="ⓘ" />
+                                </Button>
+                            </UniformGrid>
+
+                            <Border
+                                Height="1"
+                                Margin="0,0,0,8"
+                                Background="{StaticResource Win11.Menu.Separator}" />
+
+                            <!--  下段：その他のオプション（クラシックへ委譲）  -->
+                            <Button Command="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=MoreOptionsCommand}" Style="{StaticResource Win11.MenuButton}">
+                                <DockPanel LastChildFill="True">
+                                    <TextBlock Foreground="{StaticResource Win11.Menu.Text}" Text="その他のオプションを確認" />
+                                    <TextBlock
+                                        DockPanel.Dock="Right"
+                                        Foreground="{StaticResource Win11.Menu.SubtleText}"
+                                        Text="›" />
+                                </DockPanel>
+                            </Button>
+
+                        </StackPanel>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>
