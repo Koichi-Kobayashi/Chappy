@@ -1,13 +1,11 @@
 ﻿#nullable enable
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace Chappy.Wpf.Controls.ContextMenu;
 
@@ -31,10 +29,11 @@ public class ShellContextMenuDataGrid : DataGrid
         _popup = new Popup
         {
             AllowsTransparency = true,
-            StaysOpen = false,
+            StaysOpen = true,                 // ★ false → true
             Placement = PlacementMode.AbsolutePoint,
             Child = _view
         };
+        _popup.PlacementTarget = this;        // ★安定化
     }
 
     /// <summary>背景（余白）右クリックで使う「現在フォルダ」。無ければ ItemsSource の先頭から推測。</summary>
@@ -84,13 +83,36 @@ public class ShellContextMenuDataGrid : DataGrid
         _view.PropertiesCommand = new RelayCommand(_ => Properties());
 
         _view.MoreOptionsCommand = new RelayCommand(_ => ShowClassicMenu());
+
+        if (window != null)
+        {
+            window.PreviewMouseDown += Window_PreviewMouseDown_ClosePopup;
+            window.Deactivated += (_, __) => _popup.IsOpen = false;
+        }
+
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        var window = Window.GetWindow(this);
+        if (window != null)
+        {
+            window.PreviewMouseDown -= Window_PreviewMouseDown_ClosePopup;
+        }
+
         _popup.IsOpen = false;
         _shellHost?.Dispose();
         _shellHost = null;
+    }
+
+    private void Window_PreviewMouseDown_ClosePopup(object sender, MouseButtonEventArgs e)
+    {
+        if (!_popup.IsOpen) return;
+
+        // Popup内クリックなら閉じない
+        if (_view.IsMouseOver) return;
+
+        _popup.IsOpen = false;
     }
 
     private void OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -123,8 +145,13 @@ public class ShellContextMenuDataGrid : DataGrid
             _view.IsBackground = false;
             _view.SelectedPaths = paths;
 
-            OpenPopupAt(screen);
             e.Handled = true;
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                OpenPopupAt(screen);
+            }), DispatcherPriority.Input);
+
             return;
         }
 
