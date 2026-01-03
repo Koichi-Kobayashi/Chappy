@@ -57,6 +57,170 @@ public static class ShellContextMenuBehavior
     public static void SetPathPropertyName(DependencyObject d, string v) => d.SetValue(PathPropertyNameProperty, v);
     public static string GetPathPropertyName(DependencyObject d) => (string)d.GetValue(PathPropertyNameProperty);
 
+
+    /// <summary>
+    /// CutCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素にカットコマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じてカット操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによるカット操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty CutCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "CutCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるCutコマンドを設定します。
+    /// </summary>
+    /// <param name="d">cutコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetCutCommand(DependencyObject d, ICommand? v) => d.SetValue(CutCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたCutコマンドを取得します。
+    /// </summary>
+    /// <param name="d">cutコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Cutコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetCutCommand(DependencyObject d) => (ICommand?)d.GetValue(CutCommandProperty);
+
+    /// <summary>
+    /// CopyCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素にコピーコマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じてコピー操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによるコピー操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty CopyCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "CopyCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるCopyコマンドを設定します。
+    /// </summary>
+    /// <param name="d">Copyコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetCopyCommand(DependencyObject d, ICommand? v) => d.SetValue(CopyCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたCopyコマンドを取得します。
+    /// </summary>
+    /// <param name="d">Copyコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Copyコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetCopyCommand(DependencyObject d) => (ICommand?)d.GetValue(CopyCommandProperty);
+
+    /// <summary>
+    /// PasteCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素にペーストコマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じてペースト操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによるペースト操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty PasteCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "PasteCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるPasteコマンドを設定します。
+    /// </summary>
+    /// <param name="d">Pasteコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetPasteCommand(DependencyObject d, ICommand? v) => d.SetValue(PasteCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたPasteコマンドを取得します。
+    /// </summary>
+    /// <param name="d">Pasteコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Pasteコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetPasteCommand(DependencyObject d) => (ICommand?)d.GetValue(PasteCommandProperty);
+
+    /// <summary>
+    /// RenameCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素に名前変更コマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じて名前変更操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによる名前変更操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty RenameCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "RenameCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるRenameコマンドを設定します。
+    /// </summary>
+    /// <param name="d">Renameコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetRenameCommand(DependencyObject d, ICommand? v) => d.SetValue(RenameCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたRenameコマンドを取得します。
+    /// </summary>
+    /// <param name="d">Renameコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Renameコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetRenameCommand(DependencyObject d) => (ICommand?)d.GetValue(RenameCommandProperty);
+
+    /// <summary>
+    /// ShareCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素に共有コマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じて共有操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによる共有操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty ShareCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "ShareCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるShareコマンドを設定します。
+    /// </summary>
+    /// <param name="d">Shareコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetShareCommand(DependencyObject d, ICommand? v) => d.SetValue(ShareCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたShareコマンドを取得します。
+    /// </summary>
+    /// <param name="d">Shareコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Shareコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetShareCommand(DependencyObject d) => (ICommand?)d.GetValue(ShareCommandProperty);
+
+    /// <summary>
+    /// DeleteCommand 付属の依存プロパティを識別します。これにより、XAML 内の UI 要素に削除コマンドをバインドできます。
+    /// </summary>
+    /// <remarks>
+    /// このプロパティにより、開発者はUI要素にICommand実装をアタッチでき、
+    /// データバインディングを通じて削除操作のカスタム処理が可能になります。コンテキストメニューや
+    /// キーボードによる削除操作がビューモデルのコマンドを呼び出す必要があるシナリオで一般的に使用されます。
+    /// </remarks>
+    public static readonly DependencyProperty DeleteCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "DeleteCommand",
+            typeof(ICommand),
+            typeof(ShellContextMenuBehavior),
+            new PropertyMetadata(null));
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられるDeleteコマンドを設定します。
+    /// </summary>
+    /// <param name="d">Deleteコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <param name="v">依存オブジェクトに関連付けるコマンド、またはnullで既存のコマンドをクリアする。</param>
+    public static void SetDeleteCommand(DependencyObject d, ICommand? v) => d.SetValue(DeleteCommandProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトに関連付けられたDeleteコマンドを取得します。
+    /// </summary>
+    /// <param name="d">Deleteコマンドを設定する依存オブジェクト。null は指定できません。</param>
+    /// <returns>Deleteコマンドが設定されている場合にそれを表すインスタンス、そうでない場合は、null</returns>
+    public static ICommand? GetDeleteCommand(DependencyObject d) => (ICommand?)d.GetValue(DeleteCommandProperty);
+
+
     // =========================
     // 内部状態（DataGridごと）
     // =========================
@@ -268,6 +432,16 @@ public static class ShellContextMenuBehavior
 
     private static IEnumerable<object> BuildFilesLikeMenuObjects(WpfDataGrid grid, State s, Win11ContextKind kind, IReadOnlyList<string> paths)
     {
+        // 例：上段の定番操作（あなたのメニュー構成に合わせて配置）
+        yield return MI(s, "切り取り", GetCutCommand(grid), paths, gesture: "Ctrl+X");
+        yield return MI(s, "コピー", GetCopyCommand(grid), paths, gesture: "Ctrl+C");
+        yield return MI(s, "貼り付け", GetPasteCommand(grid), paths, gesture: "Ctrl+V");
+        yield return new Separator();
+
+        yield return MI(s, "名前の変更", GetRenameCommand(grid), paths, gesture: "F2");
+        yield return MI(s, "共有", GetShareCommand(grid), paths);
+        yield return MI(s, "削除", GetDeleteCommand(grid), paths, gesture: "Del");
+
         // ShellContextMenuDataGrid の BuildFilesLikeMenuObjects をそのまま移植
         if (kind == Win11ContextKind.Background)
         {
@@ -318,28 +492,68 @@ public static class ShellContextMenuBehavior
     private static MenuItem MI(
         State s,
         string header,
-        ICommand? command = null,
+        ICommand? command,
+        object? commandParameter = null,
         string? gesture = null,
         bool isChecked = false,
         bool isEnabled = true,
         IEnumerable<object>? children = null)
     {
+        // 指定がなければ無効化（表示は残す or 消すは好み）
+        var cmd = command;
+        var enabled = isEnabled && cmd != null;
+
+        // 実行後に閉じるラッパー（cmd がある時だけ）
+        ICommand? wrapped = null;
+        if (cmd != null)
+        {
+            wrapped = new RelayCommand(_ =>
+            {
+                try
+                {
+                    if (cmd.CanExecute(commandParameter))
+                        cmd.Execute(commandParameter);
+                }
+                finally
+                {
+                    s.Menu!.IsOpen = false;
+                }
+            });
+        }
+
         var mi = new MenuItem
         {
             Header = header,
-            Command = command,
+            Command = wrapped,
+            CommandParameter = commandParameter,
             InputGestureText = gesture ?? string.Empty,
             IsChecked = isChecked,
-            IsEnabled = isEnabled,
+            IsEnabled = enabled
         };
 
         if (children != null)
-        {
-            foreach (var c in children)
-                mi.Items.Add(c);
-        }
+            foreach (var c in children) mi.Items.Add(c);
 
         return mi;
+    }
+
+    private static MenuItem MI(
+    State s,
+    string header,
+    string? gesture = null,
+    bool isChecked = false,
+    bool isEnabled = true,
+    IEnumerable<object>? children = null)
+    {
+        return MI(
+            s,
+            header,
+            command: null,
+            commandParameter: null,
+            gesture: gesture,
+            isChecked: isChecked,
+            isEnabled: isEnabled,
+            children: children);
     }
 
     private static MenuItem MakeLayoutSubmenuItem(State s)
@@ -427,6 +641,18 @@ public static class ShellContextMenuBehavior
             return Path.GetDirectoryName(path);
         }
         return null;
+    }
+
+    private static IReadOnlyList<string> GetSelectedPaths(WpfDataGrid grid)
+    {
+        var propName = GetPathPropertyName(grid);
+
+        return grid.SelectedItems
+            .Cast<object>()
+            .Select(o => TryGetPathFromItem(o, propName))
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Cast<string>()
+            .ToList();
     }
 
     private static string? TryGetPathFromItem(object? item, string propName)
