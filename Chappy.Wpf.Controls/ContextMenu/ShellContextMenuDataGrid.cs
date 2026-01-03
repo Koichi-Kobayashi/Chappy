@@ -1,17 +1,15 @@
 ﻿#nullable enable
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Chappy.Wpf.Controls.ContextMenu;
 
-public class ShellContextMenuDataGrid : DataGrid
+public class ShellContextMenuDataGrid : Chappy.Wpf.Controls.DataGrid.BoxSelectDataGrid
 {
     private ShellContextMenuHost? _shellHost;
     private System.Windows.Controls.ContextMenu? _menu;
@@ -22,7 +20,9 @@ public class ShellContextMenuDataGrid : DataGrid
     {
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
-        PreviewMouseRightButtonDown += OnPreviewMouseRightButtonDown;
+
+        PreviewMouseRightButtonDown += OnRightButtonDown_SelectOnly;
+        PreviewMouseRightButtonUp += OnRightButtonUp_OpenMenu;
     }
 
     public string? CurrentFolderPath
@@ -81,51 +81,126 @@ public class ShellContextMenuDataGrid : DataGrid
         _shellHost = null;
     }
 
-    private void OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnRightButtonDown_SelectOnly(object sender, MouseButtonEventArgs e)
+    {
+        // base.OnPreviewMouseRightButtonDown(e); ← いらない（イベントハンドラ内で呼ぶ意味が薄い）
+
+        if (_menu == null) return;
+
+        var row = FindAncestorRow(e.OriginalSource as DependencyObject);
+        if (row == null) return;
+
+        var item = row.Item;
+
+        if (SelectedItems.Count > 1 && SelectedItems.Contains(item))
+            return;
+
+        SelectedItems.Clear();
+        row.IsSelected = true;
+        row.Focus();
+
+        // ★ここで e.Handled = true にしない（メニュー表示の流れを壊しやすい）
+    }
+
+    private void OnRightButtonUp_OpenMenu(object sender, MouseButtonEventArgs e)
     {
         if (_menu == null) return;
 
-        var dep = e.OriginalSource as DependencyObject;
-        var row = ItemsControl.ContainerFromElement(this, dep) as DataGridRow;
+        var pos = e.GetPosition(this);
+        _lastOpenScreenPoint = PointToScreen(pos);
 
-        var screen = PointToScreen(e.GetPosition(this));
-        _lastOpenScreenPoint = screen;
+        var row = FindAncestorRow(e.OriginalSource as DependencyObject);
 
-        // 行右クリック：行選択
+        IReadOnlyList<string> paths;
+        Win11ContextKind kind;
+
         if (row != null)
         {
-            if (!row.IsSelected)
-            {
-                SelectedItems.Clear();
-                row.IsSelected = true;
-            }
-            row.Focus();
-
-            var paths = SelectedItems.Cast<object>()
+            paths = SelectedItems.Cast<object>()
                 .Select(TryGetPathFromItem)
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Cast<string>()
                 .ToList();
 
-            var kind = ResolveKindFromSelection(paths);
-            RebuildMenuItems(kind, paths);
-
-            _menu.HorizontalOffset = screen.X;
-            _menu.VerticalOffset = screen.Y;
-            _menu.IsOpen = true;
-
-            e.Handled = true;
-            return;
+            kind = ResolveKindFromSelection(paths);
+        }
+        else
+        {
+            kind = Win11ContextKind.Background;
+            paths = Array.Empty<string>();
         }
 
-        // 余白（背景）
-        RebuildMenuItems(Win11ContextKind.Background, Array.Empty<string>());
+        RebuildMenuItems(kind, paths);
 
-        _menu.HorizontalOffset = screen.X;
-        _menu.VerticalOffset = screen.Y;
+        // ★座標ズレ対策：MousePoint を使う（これが強い）
+        _menu.PlacementTarget = this;
+        _menu.Placement = PlacementMode.MousePoint;
         _menu.IsOpen = true;
 
-        e.Handled = true;
+        e.Handled = true; // ここで止めるのはOK（あなたがメニューを出したので）
+    }
+    private void OnPreviewMouseRightButtonUp_OpenMenu(object sender, MouseButtonEventArgs e)
+    {
+        if (_menu == null) return;
+
+        var pos = e.GetPosition(this);
+        _lastOpenScreenPoint = PointToScreen(pos);
+
+        var row = FindAncestorRow(e.OriginalSource as DependencyObject);
+
+        IReadOnlyList<string> paths;
+        Win11ContextKind kind;
+
+        if (row != null)
+        {
+            paths = SelectedItems.Cast<object>()
+                .Select(TryGetPathFromItem)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Cast<string>()
+                .ToList();
+
+            kind = ResolveKindFromSelection(paths);
+        }
+        else
+        {
+            kind = Win11ContextKind.Background;
+            paths = Array.Empty<string>();
+        }
+
+        RebuildMenuItems(kind, paths);
+
+        // ★座標ズレ対策：MousePoint を使う（これが強い）
+        _menu.PlacementTarget = this;
+        _menu.Placement = PlacementMode.MousePoint;
+        _menu.IsOpen = true;
+
+        e.Handled = true; // ここで止めるのはOK（あなたがメニューを出したので）
+    }
+
+    private static DataGridRow? FindAncestorRow(DependencyObject? d)
+    {
+        while (d != null)
+        {
+            if (d is DataGridRow row) return row;
+
+            // Visual だけだと null になりがちなので Logical も見る
+            var parent = LogicalTreeHelper.GetParent(d);
+            if (parent != null)
+            {
+                d = parent;
+                continue;
+            }
+
+            // FrameworkContentElement(例: Run) の親辿り
+            if (d is FrameworkContentElement fce && fce.Parent is DependencyObject p2)
+            {
+                d = p2;
+                continue;
+            }
+
+            d = VisualTreeHelper.GetParent(d);
+        }
+        return null;
     }
 
     private void RebuildMenuItems(Win11ContextKind kind, IReadOnlyList<string> paths)
