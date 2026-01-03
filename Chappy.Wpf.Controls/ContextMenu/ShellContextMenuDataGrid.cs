@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
-using System.Windows.Threading;
 
 namespace Chappy.Wpf.Controls.ContextMenu;
 
@@ -22,21 +21,20 @@ public class ShellContextMenuDataGrid : DataGrid
     {
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
-
         PreviewMouseRightButtonDown += OnPreviewMouseRightButtonDown;
 
         _view = new Win11ContextMenuView();
+
         _popup = new Popup
         {
             AllowsTransparency = true,
-            StaysOpen = true,                 // ★ false → true
+            StaysOpen = true,                  // ★ 重要：押してる間だけ問題を根治
             Placement = PlacementMode.AbsolutePoint,
             Child = _view
         };
-        _popup.PlacementTarget = this;        // ★安定化
+        _popup.PlacementTarget = this;
     }
 
-    /// <summary>背景（余白）右クリックで使う「現在フォルダ」。無ければ ItemsSource の先頭から推測。</summary>
     public string? CurrentFolderPath
     {
         get => (string?)GetValue(CurrentFolderPathProperty);
@@ -46,7 +44,6 @@ public class ShellContextMenuDataGrid : DataGrid
         DependencyProperty.Register(nameof(CurrentFolderPath), typeof(string),
             typeof(ShellContextMenuDataGrid), new PropertyMetadata(null));
 
-    /// <summary>行アイテムからパスを取るプロパティ名（既定 FullPath）</summary>
     public string PathPropertyName
     {
         get => (string)GetValue(PathPropertyNameProperty);
@@ -56,51 +53,54 @@ public class ShellContextMenuDataGrid : DataGrid
         DependencyProperty.Register(nameof(PathPropertyName), typeof(string),
             typeof(ShellContextMenuDataGrid), new PropertyMetadata("FullPath"));
 
+    private Window? _window;
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // ShellContextMenuHost は Window の hwnd が必要（SourceInitialized 後）
-        var window = Window.GetWindow(this);
-        if (window == null) return;
+        _window = Window.GetWindow(this);
+        if (_window == null) return;
 
-        // Loaded 時点で hwnd が 0 の可能性もあるので保険
-        window.SourceInitialized += (_, __) =>
+        _window.SourceInitialized += (_, __) =>
         {
-            if (_shellHost == null)
-                _shellHost = new ShellContextMenuHost(window);
+            _shellHost ??= new ShellContextMenuHost(_window);
         };
+        _shellHost ??= new ShellContextMenuHost(_window);
 
-        // すでに hwnd があるなら即作る
-        if (_shellHost == null)
-        {
-            try { _shellHost = new ShellContextMenuHost(window); }
-            catch { /* hwnd 0 の場合は SourceInitialized で作られる */ }
-        }
+        // 外側クリックで閉じる
+        _window.PreviewMouseDown += Window_PreviewMouseDown_ClosePopup;
+        _window.Deactivated += (_, __) => _popup.IsOpen = false;
 
-        // コマンド設定（Viewにバインドされる）
-        _view.CutCommand = new RelayCommand(_ => Cut());
-        _view.CopyCommand = new RelayCommand(_ => Copy());
-        _view.DeleteCommand = new RelayCommand(_ => DeleteToRecycleBin());
-        _view.PropertiesCommand = new RelayCommand(_ => Properties());
-
+        // View コマンド（最小：実行は “その他” へ逃がしてもOK）
         _view.MoreOptionsCommand = new RelayCommand(_ => ShowClassicMenu());
 
-        if (window != null)
-        {
-            window.PreviewMouseDown += Window_PreviewMouseDown_ClosePopup;
-            window.Deactivated += (_, __) => _popup.IsOpen = false;
-        }
+        // まずは Filesっぽい“見た目”重視：上段は未実装でもOK（必要なら後で実装）
+        _view.CutCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.CopyCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.PasteCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.RenameCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.ShareCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.DeleteCommand = new RelayCommand(_ => { _popup.IsOpen = false; /* TODO */ });
+        _view.PropertiesCommand = new RelayCommand(_ => { _popup.IsOpen = false; ShowClassicMenu(); });
 
+        // “開く”系はあなたのアプリ動作に繋ぎやすいようイベントで逃がしてある
+        _view.OpenRequested += (_, __) => { _popup.IsOpen = false; /* TODO: open */ };
+        _view.OpenNewTabRequested += (_, __) => { _popup.IsOpen = false; /* TODO */ };
+        _view.OpenNewWindowRequested += (_, __) => { _popup.IsOpen = false; /* TODO */ };
+        _view.OpenNewPaneRequested += (_, __) => { _popup.IsOpen = false; /* TODO */ };
+        _view.CopyPathRequested += (_, __) => { _popup.IsOpen = false; /* TODO */ };
+        _view.RefreshRequested += (_, __) => { _popup.IsOpen = false; /* TODO */ };
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
-        var window = Window.GetWindow(this);
-        if (window != null)
+        _popup.IsOpen = false;
+
+        if (_window != null)
         {
-            window.PreviewMouseDown -= Window_PreviewMouseDown_ClosePopup;
+            _window.PreviewMouseDown -= Window_PreviewMouseDown_ClosePopup;
+            _window = null;
         }
 
-        _popup.IsOpen = false;
         _shellHost?.Dispose();
         _shellHost = null;
     }
@@ -108,10 +108,7 @@ public class ShellContextMenuDataGrid : DataGrid
     private void Window_PreviewMouseDown_ClosePopup(object sender, MouseButtonEventArgs e)
     {
         if (!_popup.IsOpen) return;
-
-        // Popup内クリックなら閉じない
-        if (_view.IsMouseOver) return;
-
+        if (_view.IsMouseOver) return; // Popup内は閉じない
         _popup.IsOpen = false;
     }
 
@@ -127,7 +124,6 @@ public class ShellContextMenuDataGrid : DataGrid
 
         if (row != null)
         {
-            // Explorer互換：右クリックした行が未選択ならその行だけ選択
             if (!row.IsSelected)
             {
                 SelectedItems.Clear();
@@ -142,23 +138,18 @@ public class ShellContextMenuDataGrid : DataGrid
                 .Cast<string>()
                 .ToList();
 
-            _view.IsBackground = false;
+            var kind = ResolveKindFromSelection(paths);
+            _view.Kind = kind;
             _view.SelectedPaths = paths;
 
+            OpenPopupAt(screen);
             e.Handled = true;
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                OpenPopupAt(screen);
-            }), DispatcherPriority.Input);
-
             return;
         }
 
-        // 余白：背景メニュー
-        _view.IsBackground = true;
+        // 余白＝Background
+        _view.Kind = Win11ContextKind.Background;
         _view.SelectedPaths = Array.Empty<string>();
-
         OpenPopupAt(screen);
         e.Handled = true;
     }
@@ -173,27 +164,34 @@ public class ShellContextMenuDataGrid : DataGrid
     private void ShowClassicMenu()
     {
         _popup.IsOpen = false;
-
         if (_shellHost == null) return;
 
-        if (_view.IsBackground)
+        if (_view.Kind == Win11ContextKind.Background)
         {
             var folder = ResolveCurrentFolderPath();
             if (!string.IsNullOrWhiteSpace(folder))
                 _shellHost.ShowForFolderBackground(folder!, _lastOpenScreenPoint);
-
             return;
         }
 
         var paths = _view.SelectedPaths ?? Array.Empty<string>();
         if (paths.Count == 1)
-        {
             _shellHost.ShowForItem(paths[0], _lastOpenScreenPoint);
-        }
         else if (paths.Count >= 2)
-        {
             _shellHost.ShowForItems(paths, _lastOpenScreenPoint);
+    }
+
+    private Win11ContextKind ResolveKindFromSelection(IReadOnlyList<string> paths)
+    {
+        // Files風：フォルダ右クリック / ファイル右クリックを分ける
+        if (paths.Count == 1)
+        {
+            var p = paths[0];
+            if (Directory.Exists(p)) return Win11ContextKind.Folder;
+            return Win11ContextKind.File;
         }
+        // 複数は基本「ファイル扱い」に寄せ（必要なら後でフォルダ混在も判定）
+        return Win11ContextKind.File;
     }
 
     private string? ResolveCurrentFolderPath()
@@ -201,7 +199,7 @@ public class ShellContextMenuDataGrid : DataGrid
         if (!string.IsNullOrWhiteSpace(CurrentFolderPath))
             return CurrentFolderPath;
 
-        // ItemsSource 先頭から推測
+        // ItemsSource先頭から推測
         if (ItemsSource is not IEnumerable enumerable) return null;
 
         foreach (var item in enumerable)
@@ -212,7 +210,6 @@ public class ShellContextMenuDataGrid : DataGrid
             if (Directory.Exists(path)) return path;
             return Path.GetDirectoryName(path);
         }
-
         return null;
     }
 
@@ -220,7 +217,6 @@ public class ShellContextMenuDataGrid : DataGrid
     {
         if (item == null) return null;
 
-        // IDictionary 対応（Expando等）
         if (item is IDictionary dict && dict.Contains(PathPropertyName))
             return dict[PathPropertyName]?.ToString();
 
@@ -228,86 +224,4 @@ public class ShellContextMenuDataGrid : DataGrid
         return prop?.GetValue(item)?.ToString();
     }
 
-    // ======= 自前実装（最小：Cut/Copy/Delete/Properties） =======
-
-    private IReadOnlyList<string> GetValidSelectedPaths()
-    {
-        var paths = _view.SelectedPaths ?? Array.Empty<string>();
-        return paths.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
-    }
-
-    private void Copy()
-    {
-        var paths = GetValidSelectedPaths();
-        if (paths.Count == 0) return;
-
-        var dropList = new System.Collections.Specialized.StringCollection();
-        foreach (var p in paths) dropList.Add(p);
-
-        Clipboard.SetFileDropList(dropList);
-        _popup.IsOpen = false;
-    }
-
-    private void Cut()
-    {
-        var paths = GetValidSelectedPaths();
-        if (paths.Count == 0) return;
-
-        var dropList = new System.Collections.Specialized.StringCollection();
-        foreach (var p in paths) dropList.Add(p);
-
-        Clipboard.SetFileDropList(dropList);
-
-        // Move を示す DropEffect（Explorer互換で使われがち）
-        var data = Clipboard.GetDataObject();
-        if (data is DataObject dobj)
-        {
-            dobj.SetData("Preferred DropEffect", new MemoryStream(new byte[] { 2, 0, 0, 0 }));
-            Clipboard.SetDataObject(dobj, true);
-        }
-
-        _popup.IsOpen = false;
-    }
-
-    private void DeleteToRecycleBin()
-    {
-        var paths = GetValidSelectedPaths();
-        if (paths.Count == 0) return;
-
-        // WinForms依存ゼロ（Microsoft.VisualBasic を使う）
-        // ※ 参照が無い場合：プロジェクトに Microsoft.VisualBasic を追加
-        try
-        {
-            foreach (var p in paths)
-            {
-                if (Directory.Exists(p))
-                {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
-                        p,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                }
-                else if (File.Exists(p))
-                {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                        p,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                }
-            }
-        }
-        catch { }
-
-        _popup.IsOpen = false;
-    }
-
-    private void Properties()
-    {
-        var paths = GetValidSelectedPaths();
-        if (paths.Count != 1) return;
-
-        // “プロパティ”はクラシックに委譲してもOK。ここは最小なのでクラシックへ寄せる。
-        _popup.IsOpen = false;
-        _shellHost?.ShowForItem(paths[0], _lastOpenScreenPoint);
-    }
 }
