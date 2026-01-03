@@ -1,12 +1,22 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 
 namespace Chappy.Wpf.Controls.ColorPicker.Converter;
 
+/// <summary>
+/// 色を背景色とアルファブレンドして16進数文字列に変換するコンバーター
+/// </summary>
 public sealed class ColorAlphaBlendToHexConverter : IValueConverter
 {
-    // parameter: 背景色 "#FFFFFFFF" など
+    /// <summary>
+    /// 色を背景色とアルファブレンドして16進数文字列に変換する
+    /// </summary>
+    /// <param name="value">変換元の値（Color）</param>
+    /// <param name="targetType">変換先の型</param>
+    /// <param name="parameter">背景色（"#FFFFFFFF"などの文字列形式）</param>
+    /// <param name="culture">カルチャー情報</param>
+    /// <returns>16進数文字列（"#FFRRGGBB"形式）</returns>
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         if (value is not Color src)
@@ -28,6 +38,9 @@ public sealed class ColorAlphaBlendToHexConverter : IValueConverter
         return $"#FF{r:X2}{g:X2}{b:X2}";
     }
 
+    /// <summary>
+    /// 逆変換はサポートされていません
+    /// </summary>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 }

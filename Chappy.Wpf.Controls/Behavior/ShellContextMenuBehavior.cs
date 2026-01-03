@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Chappy.Wpf.Controls.ContextMenu;
 using System;
 using System.Collections;
@@ -16,11 +16,17 @@ using WpfDataGrid = System.Windows.Controls.DataGrid;
 
 namespace Chappy.Wpf.Controls.Behaviors;
 
+/// <summary>
+/// DataGridにシェルコンテキストメニュー機能を追加するビヘイビアクラス
+/// </summary>
 public static class ShellContextMenuBehavior
 {
     // =========================
     // IsEnabled
     // =========================
+    /// <summary>
+    /// シェルコンテキストメニュー機能の有効/無効を制御する依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty IsEnabledProperty =
         DependencyProperty.RegisterAttached(
             "IsEnabled",
@@ -28,7 +34,17 @@ public static class ShellContextMenuBehavior
             typeof(ShellContextMenuBehavior),
             new PropertyMetadata(false, OnChanged));
 
+    /// <summary>
+    /// 指定された依存オブジェクトにシェルコンテキストメニュー機能を有効にする
+    /// </summary>
+    /// <param name="d">対象の依存オブジェクト</param>
+    /// <param name="v">有効にする場合はtrue、無効にする場合はfalse</param>
     public static void SetIsEnabled(DependencyObject d, bool v) => d.SetValue(IsEnabledProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトのシェルコンテキストメニュー機能の有効/無効状態を取得する
+    /// </summary>
+    /// <param name="d">対象の依存オブジェクト</param>
+    /// <returns>有効な場合はtrue、無効な場合はfalse</returns>
     public static bool GetIsEnabled(DependencyObject d) => (bool)d.GetValue(IsEnabledProperty);
 
     // =========================
@@ -47,6 +63,9 @@ public static class ShellContextMenuBehavior
     // =========================
     // PathPropertyName
     // =========================
+    /// <summary>
+    /// データアイテムからパスを取得する際に使用するプロパティ名を指定する依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty PathPropertyNameProperty =
         DependencyProperty.RegisterAttached(
             "PathPropertyName",
@@ -54,7 +73,17 @@ public static class ShellContextMenuBehavior
             typeof(ShellContextMenuBehavior),
             new PropertyMetadata("FullPath"));
 
+    /// <summary>
+    /// 指定された依存オブジェクトにパスプロパティ名を設定する
+    /// </summary>
+    /// <param name="d">対象の依存オブジェクト</param>
+    /// <param name="v">プロパティ名</param>
     public static void SetPathPropertyName(DependencyObject d, string v) => d.SetValue(PathPropertyNameProperty, v);
+    /// <summary>
+    /// 指定された依存オブジェクトのパスプロパティ名を取得する
+    /// </summary>
+    /// <param name="d">対象の依存オブジェクト</param>
+    /// <returns>プロパティ名（デフォルトは"FullPath"）</returns>
     public static string GetPathPropertyName(DependencyObject d) => (string)d.GetValue(PathPropertyNameProperty);
 
 
@@ -251,6 +280,12 @@ public static class ShellContextMenuBehavior
     // =========================
     // attach/detach
     // =========================
+    /// <summary>
+    /// IsEnabledPropertyの変更時に呼ばれるコールバック
+    /// イベントハンドラの登録/解除を行う
+    /// </summary>
+    /// <param name="d">変更された依存オブジェクト</param>
+    /// <param name="e">変更イベントの引数</param>
     private static void OnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not WpfDataGrid grid) return;
@@ -308,6 +343,12 @@ public static class ShellContextMenuBehavior
         };
     }
 
+    /// <summary>
+    /// DataGridがアンロードされた時のイベントハンドラ
+    /// リソースをクリーンアップする
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">ルーティングイベントの引数</param>
     private static void OnUnloaded(object sender, RoutedEventArgs e)
     {
         if (sender is not WpfDataGrid grid) return;
@@ -322,6 +363,12 @@ public static class ShellContextMenuBehavior
     // =========================
     // 右クリック：Downは選択だけ（Handledしない）
     // =========================
+    /// <summary>
+    /// マウス右ボタン押下時のイベントハンドラ
+    /// クリックした行を選択する（Explorer風の動作）
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">マウスボタンイベントの引数</param>
     private static void OnRightDown_SelectOnly(object sender, MouseButtonEventArgs e)
     {
         if (sender is not WpfDataGrid grid) return;
@@ -388,6 +435,12 @@ public static class ShellContextMenuBehavior
     // =========================
     // Row探索（Visual/Logical/Run対応）
     // =========================
+    /// <summary>
+    /// 指定された要素の祖先要素からDataGridRowを検索する
+    /// VisualツリーとLogicalツリーの両方を探索する
+    /// </summary>
+    /// <param name="d">探索を開始する要素</param>
+    /// <returns>見つかったDataGridRow、見つからない場合はnull</returns>
     private static DataGridRow? FindAncestorRow(DependencyObject? d)
     {
         while (d != null)
@@ -415,6 +468,13 @@ public static class ShellContextMenuBehavior
     // =========================
     // ここから「既存メニュー移植」
     // =========================
+    /// <summary>
+    /// コンテキストメニューの項目を再構築する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <param name="s">内部状態</param>
+    /// <param name="kind">コンテキストメニューの種類</param>
+    /// <param name="paths">選択されているパスのリスト</param>
     private static void RebuildMenuItems(WpfDataGrid grid, State s, Win11ContextKind kind, IReadOnlyList<string> paths)
     {
         if (s.Menu == null) return;
@@ -424,12 +484,25 @@ public static class ShellContextMenuBehavior
             s.Menu.Items.Add(obj);
     }
 
+    /// <summary>
+    /// 選択されたパスからコンテキストメニューの種類を決定する
+    /// </summary>
+    /// <param name="paths">選択されているパスのリスト</param>
+    /// <returns>コンテキストメニューの種類</returns>
     private static Win11ContextKind ResolveKindFromSelection(IReadOnlyList<string> paths)
     {
         if (paths.Count == 1 && Directory.Exists(paths[0])) return Win11ContextKind.Folder;
         return Win11ContextKind.File;
     }
 
+    /// <summary>
+    /// Files風のメニュー項目を構築する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <param name="s">内部状態</param>
+    /// <param name="kind">コンテキストメニューの種類</param>
+    /// <param name="paths">選択されているパスのリスト</param>
+    /// <returns>メニュー項目の列挙</returns>
     private static IEnumerable<object> BuildFilesLikeMenuObjects(WpfDataGrid grid, State s, Win11ContextKind kind, IReadOnlyList<string> paths)
     {
         // 例：上段の定番操作（あなたのメニュー構成に合わせて配置）
@@ -489,6 +562,18 @@ public static class ShellContextMenuBehavior
         yield return MI(s, "その他のオプションを確認", new RelayCommand(_ => ShowClassicForSelection(grid, s, paths)));
     }
 
+    /// <summary>
+    /// MenuItemを作成するヘルパーメソッド
+    /// </summary>
+    /// <param name="s">内部状態</param>
+    /// <param name="header">メニュー項目のヘッダーテキスト</param>
+    /// <param name="command">実行するコマンド</param>
+    /// <param name="commandParameter">コマンドのパラメータ</param>
+    /// <param name="gesture">入力ジェスチャー（ショートカットキー）</param>
+    /// <param name="isChecked">チェック状態</param>
+    /// <param name="isEnabled">有効/無効</param>
+    /// <param name="children">子メニュー項目</param>
+    /// <returns>作成されたMenuItem</returns>
     private static MenuItem MI(
         State s,
         string header,
@@ -537,6 +622,16 @@ public static class ShellContextMenuBehavior
         return mi;
     }
 
+    /// <summary>
+    /// MenuItemを作成するヘルパーメソッド（コマンドなし版）
+    /// </summary>
+    /// <param name="s">内部状態</param>
+    /// <param name="header">メニュー項目のヘッダーテキスト</param>
+    /// <param name="gesture">入力ジェスチャー（ショートカットキー）</param>
+    /// <param name="isChecked">チェック状態</param>
+    /// <param name="isEnabled">有効/無効</param>
+    /// <param name="children">子メニュー項目</param>
+    /// <returns>作成されたMenuItem</returns>
     private static MenuItem MI(
     State s,
     string header,
@@ -556,6 +651,11 @@ public static class ShellContextMenuBehavior
             children: children);
     }
 
+    /// <summary>
+    /// レイアウトサブメニュー項目を作成する
+    /// </summary>
+    /// <param name="s">内部状態</param>
+    /// <returns>作成されたMenuItem</returns>
     private static MenuItem MakeLayoutSubmenuItem(State s)
     {
         return MI(s, "レイアウト", children: new object[]
@@ -570,6 +670,11 @@ public static class ShellContextMenuBehavior
         });
     }
 
+    /// <summary>
+    /// 並べ替えサブメニュー項目を作成する
+    /// </summary>
+    /// <param name="s">内部状態</param>
+    /// <returns>作成されたMenuItem</returns>
     private static MenuItem MakeSortSubmenuItem(State s)
     {
         return MI(s, "並べ替え", children: new object[]
@@ -586,6 +691,11 @@ public static class ShellContextMenuBehavior
         });
     }
 
+    /// <summary>
+    /// グループ表示サブメニュー項目を作成する
+    /// </summary>
+    /// <param name="s">内部状態</param>
+    /// <returns>作成されたMenuItem</returns>
     private static MenuItem MakeGroupSubmenuItem(State s)
     {
         return MI(s, "グループで表示", children: new object[]
@@ -603,6 +713,12 @@ public static class ShellContextMenuBehavior
         });
     }
 
+    /// <summary>
+    /// 選択項目用のクラシックコンテキストメニューを表示する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <param name="s">内部状態</param>
+    /// <param name="paths">選択されているパスのリスト</param>
     private static void ShowClassicForSelection(WpfDataGrid grid, State s, IReadOnlyList<string> paths)
     {
         s.Menu!.IsOpen = false;
@@ -612,6 +728,11 @@ public static class ShellContextMenuBehavior
         else if (paths.Count >= 2) s.Host.ShowForItems(paths, s.LastOpenScreenPoint);
     }
 
+    /// <summary>
+    /// 背景用のクラシックコンテキストメニューを表示する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <param name="s">内部状態</param>
     private static void ShowClassicBackground(WpfDataGrid grid, State s)
     {
         s.Menu!.IsOpen = false;
@@ -622,6 +743,12 @@ public static class ShellContextMenuBehavior
             s.Host.ShowForFolderBackground(folder!, s.LastOpenScreenPoint);
     }
 
+    /// <summary>
+    /// 現在のフォルダパスを解決する
+    /// まず添付プロパティから取得を試み、失敗した場合はItemsSourceから推測する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <returns>フォルダパス（見つからない場合はnull）</returns>
     private static string? ResolveCurrentFolderPath(WpfDataGrid grid)
     {
         var fromAttached = GetCurrentFolderPath(grid);
@@ -643,6 +770,11 @@ public static class ShellContextMenuBehavior
         return null;
     }
 
+    /// <summary>
+    /// DataGridから選択されているパスのリストを取得する
+    /// </summary>
+    /// <param name="grid">対象のDataGrid</param>
+    /// <returns>選択されているパスのリスト</returns>
     private static IReadOnlyList<string> GetSelectedPaths(WpfDataGrid grid)
     {
         var propName = GetPathPropertyName(grid);
@@ -655,6 +787,13 @@ public static class ShellContextMenuBehavior
             .ToList();
     }
 
+    /// <summary>
+    /// データアイテムからパスを取得する
+    /// IDictionaryまたはプロパティから取得を試みる
+    /// </summary>
+    /// <param name="item">データアイテム</param>
+    /// <param name="propName">パスを取得するプロパティ名</param>
+    /// <returns>パス（取得できない場合はnull）</returns>
     private static string? TryGetPathFromItem(object? item, string propName)
     {
         if (item == null) return null;

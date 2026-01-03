@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -9,6 +9,10 @@ using Chappy.Wpf.Controls.Uitl;
 
 namespace Chappy.Wpf.Controls.ColorPicker;
 
+/// <summary>
+/// カラーピッカーコントロール
+/// HSV色空間を使用して色を選択できる
+/// </summary>
 [TemplatePart(Name = PartSpectrumImage, Type = typeof(Image))]
 [TemplatePart(Name = PartSpectrumCanvas, Type = typeof(Canvas))]
 [TemplatePart(Name = PartSpectrumThumb, Type = typeof(Thumb))]
@@ -17,14 +21,22 @@ namespace Chappy.Wpf.Controls.ColorPicker;
 [TemplatePart(Name = PartPaletteItems, Type = typeof(ItemsControl))]
 public partial class ColorPicker : Control
 {
+    /// <summary>スペクトラム画像のテンプレートパート名</summary>
     private const string PartSpectrumImage = "PART_SpectrumImage";
+    /// <summary>スペクトラムキャンバスのテンプレートパート名</summary>
     private const string PartSpectrumCanvas = "PART_SpectrumCanvas";
+    /// <summary>スペクトラムつまみのテンプレートパート名</summary>
     private const string PartSpectrumThumb = "PART_SpectrumThumb";
+    /// <summary>色相スライダーのテンプレートパート名</summary>
     private const string PartHueSlider = "PART_HueSlider";
+    /// <summary>アルファスライダーのテンプレートパート名</summary>
     private const string PartAlphaSlider = "PART_AlphaSlider";
+    /// <summary>パレットアイテムのテンプレートパート名</summary>
     private const string PartPaletteItems = "PART_PaletteItems";
 
+    /// <summary>プロパティ変更の同期中かどうかを示すフラグ</summary>
     private bool _syncing;
+    /// <summary>パレットアイテムコントロール</summary>
     private ItemsControl? _paletteItems;
 
     static ColorPicker()
@@ -80,16 +92,25 @@ public partial class ColorPicker : Control
         });
     }
 
+    /// <summary>スペクトラム画像</summary>
     private Image? _spectrumImage;
+    /// <summary>スペクトラムキャンバス</summary>
     private Canvas? _spectrumCanvas;
+    /// <summary>スペクトラムつまみ</summary>
     private Thumb? _spectrumThumb;
+    /// <summary>色相スライダー</summary>
     private Slider? _hueSlider;
+    /// <summary>アルファスライダー</summary>
     private Slider? _alphaSlider;
 
+    /// <summary>スペクトラム用のビットマップ</summary>
     private WriteableBitmap? _spectrumBitmap;
+    /// <summary>ビットマップの幅</summary>
     private int _bmpW;
+    /// <summary>ビットマップの高さ</summary>
     private int _bmpH;
 
+    /// <summary>テンプレート更新中かどうかを示すフラグ</summary>
     private bool _isTemplateUpdating;
 
     #region Dependency Properties
@@ -110,6 +131,9 @@ public partial class ColorPicker : Control
         set => SetValue(SelectedColorProperty, value);
     }
 
+    /// <summary>
+    /// 色相（0-360度）を表す依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty HueProperty =
         DependencyProperty.Register(
             nameof(Hue),
@@ -119,6 +143,9 @@ public partial class ColorPicker : Control
                 FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                 OnHSVChanged, CoerceHue));
 
+    /// <summary>
+    /// 色相（0-360度）を取得または設定する
+    /// </summary>
     public double Hue
     {
         get => (double)GetValue(HueProperty);
@@ -140,6 +167,9 @@ public partial class ColorPicker : Control
         set => SetValue(SaturationProperty, value);
     }
 
+    /// <summary>
+    /// 明度（0-1）を表す依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty ValueProperty =
         DependencyProperty.Register(
             nameof(Value),
@@ -149,12 +179,18 @@ public partial class ColorPicker : Control
                 FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                 OnHSVChanged, CoerceUnit));
 
+    /// <summary>
+    /// 明度（0-1）を取得または設定する
+    /// </summary>
     public double Value
     {
         get => (double)GetValue(ValueProperty);
         set => SetValue(ValueProperty, value);
     }
 
+    /// <summary>
+    /// アルファ値（0-1）を表す依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty AlphaProperty =
         DependencyProperty.Register(
             nameof(Alpha),
@@ -164,12 +200,18 @@ public partial class ColorPicker : Control
                 FrameworkPropertyMetadataOptions.BindsTwoWayByDefault,
                 OnAlphaChanged, CoerceUnit));
 
+    /// <summary>
+    /// アルファ値（0-1）を取得または設定する
+    /// </summary>
     public double Alpha
     {
         get => (double)GetValue(AlphaProperty);
         set => SetValue(AlphaProperty, value);
     }
 
+    /// <summary>
+    /// パレット色のコレクションを表す依存プロパティ
+    /// </summary>
     public static readonly DependencyProperty PaletteColorsProperty =
         DependencyProperty.Register(
             nameof(PaletteColors),
@@ -177,6 +219,9 @@ public partial class ColorPicker : Control
             typeof(ColorPicker),
             new FrameworkPropertyMetadata(null));
 
+    /// <summary>
+    /// パレット色のコレクションを取得または設定する
+    /// </summary>
     public ObservableCollection<PaletteColor> PaletteColors
     {
         get => (ObservableCollection<PaletteColor>)GetValue(PaletteColorsProperty);
@@ -199,6 +244,12 @@ public partial class ColorPicker : Control
         set => SetValue(ToolTipLanguageProperty, value);
     }
 
+    /// <summary>
+    /// 色相の値を0-360度の範囲に正規化する
+    /// </summary>
+    /// <param name="d">依存オブジェクト</param>
+    /// <param name="baseValue">元の値</param>
+    /// <returns>正規化された値</returns>
     private static object CoerceHue(DependencyObject d, object baseValue)
     {
         var v = (double)baseValue;
@@ -208,6 +259,12 @@ public partial class ColorPicker : Control
         return v;
     }
 
+    /// <summary>
+    /// 単位値（0-1）をクランプする
+    /// </summary>
+    /// <param name="d">依存オブジェクト</param>
+    /// <param name="baseValue">元の値</param>
+    /// <returns>クランプされた値</returns>
     private static object CoerceUnit(DependencyObject d, object baseValue)
     {
         var v = (double)baseValue;
@@ -219,6 +276,10 @@ public partial class ColorPicker : Control
 
     #endregion
 
+    /// <summary>
+    /// テンプレートが適用された時に呼ばれる
+    /// テンプレートパートを取得し、イベントハンドラを設定する
+    /// </summary>
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -254,6 +315,9 @@ public partial class ColorPicker : Control
         }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    /// <summary>
+    /// イベントハンドラをアタッチする
+    /// </summary>
     private void Attach()
     {
         if (_spectrumCanvas != null)
@@ -277,6 +341,9 @@ public partial class ColorPicker : Control
         }
     }
 
+    /// <summary>
+    /// イベントハンドラをデタッチする
+    /// </summary>
     private void Detach()
     {
         if (_spectrumCanvas != null)
@@ -297,6 +364,11 @@ public partial class ColorPicker : Control
             _spectrumThumb.DragDelta -= OnThumbDragDelta;
     }
 
+    /// <summary>
+    /// パレットのボタンがクリックされた時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">ルーティングイベントの引数</param>
     private void OnAnyButtonClick(object sender, RoutedEventArgs e)
     {
         // パレットのタイルボタンだけ処理（TagにColorを入れる）
@@ -366,12 +438,22 @@ public partial class ColorPicker : Control
         SetSVFromPoint(e.GetPosition(_spectrumCanvas));
     }
 
+    /// <summary>
+    /// スペクトラム上でマウスが移動した時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">マウスイベントの引数</param>
     private void OnSpectrumMouseMove(object sender, MouseEventArgs e)
     {
         if (!_capturing || _spectrumCanvas == null) return;
         SetSVFromPoint(e.GetPosition(_spectrumCanvas));
     }
 
+    /// <summary>
+    /// スペクトラム上でマウス左ボタンが解放された時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">マウスボタンイベントの引数</param>
     private void OnSpectrumMouseUp(object sender, MouseButtonEventArgs e)
     {
         if (_spectrumCanvas == null) return;
@@ -379,6 +461,11 @@ public partial class ColorPicker : Control
         _spectrumCanvas.ReleaseMouseCapture();
     }
 
+    /// <summary>
+    /// つまみがドラッグされた時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">ドラッグイベントの引数</param>
     private void OnThumbDragDelta(object sender, DragDeltaEventArgs e)
     {
         if (_spectrumCanvas == null) return;
@@ -397,6 +484,10 @@ public partial class ColorPicker : Control
         SetSVFromPoint(new Point(x, y));
     }
 
+    /// <summary>
+    /// 指定されたポイントから彩度と明度を設定する
+    /// </summary>
+    /// <param name="p">キャンバス上のポイント</param>
     private void SetSVFromPoint(Point p)
     {
         if (_spectrumCanvas == null) return;
@@ -479,12 +570,22 @@ public partial class ColorPicker : Control
 
     #region Sliders
 
+    /// <summary>
+    /// 色相スライダーの値が変更された時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">プロパティ変更イベントの引数（0-360度）</param>
     private void OnHueSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         // Slider(0..360)
         Hue = e.NewValue;
     }
 
+    /// <summary>
+    /// アルファスライダーの値が変更された時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">プロパティ変更イベントの引数（0-1）</param>
     private void OnAlphaSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         // Slider(0..1)
@@ -495,6 +596,11 @@ public partial class ColorPicker : Control
 
     #region Spectrum rendering
 
+    /// <summary>
+    /// スペクトラムのサイズが変更された時のイベントハンドラ
+    /// </summary>
+    /// <param name="sender">イベント送信元</param>
+    /// <param name="e">サイズ変更イベントの引数</param>
     private void OnSpectrumSizeChanged(object sender, SizeChangedEventArgs e)
     {
         RebuildSpectrumBitmapIfNeeded();
@@ -502,6 +608,9 @@ public partial class ColorPicker : Control
         UpdateThumbPosition();
     }
 
+    /// <summary>
+    /// スペクトラムビットマップを必要に応じて再構築する
+    /// </summary>
     private void RebuildSpectrumBitmapIfNeeded()
     {
         if (_spectrumImage == null || _spectrumCanvas == null) return;
@@ -520,6 +629,9 @@ public partial class ColorPicker : Control
     }
 
 
+    /// <summary>
+    /// 現在の色相に基づいてスペクトラムを描画する
+    /// </summary>
     private void RenderSpectrum()
     {
         if (_spectrumBitmap == null) return;
@@ -554,6 +666,9 @@ public partial class ColorPicker : Control
         _spectrumBitmap.WritePixels(new Int32Rect(0, 0, w, h), pixels, stride, 0);
     }
 
+    /// <summary>
+    /// 現在の彩度と明度に基づいてつまみの位置を更新する
+    /// </summary>
     private void UpdateThumbPosition()
     {
         if (_spectrumCanvas == null || _spectrumThumb == null) return;
@@ -580,6 +695,10 @@ public partial class ColorPicker : Control
 
     #region Sync helpers
 
+    /// <summary>
+    /// 選択された色からHSV値を同期する
+    /// </summary>
+    /// <param name="c">選択された色</param>
     private void SyncFromSelectedColor(Color c)
     {
         var hsv = HsvColor.FromColor(c);
@@ -598,6 +717,9 @@ public partial class ColorPicker : Control
         }
     }
 
+    /// <summary>
+    /// 現在のHSV値から選択色を更新する
+    /// </summary>
     private void UpdateSelectedColorFromHSV()
     {
         var c = HsvColor.FromHsv(Hue, Saturation, Value).ToColor(Alpha);

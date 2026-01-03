@@ -1,14 +1,26 @@
-﻿using System;
+using System;
 using System.Windows.Media;
 
 namespace Chappy.Wpf.Controls.ColorPicker;
 
+/// <summary>
+/// HSV色空間を表す構造体
+/// </summary>
 public readonly struct HsvColor
 {
+    /// <summary>色相（0-360度）</summary>
     public double H { get; } // 0..360
+    /// <summary>彩度（0-1）</summary>
     public double S { get; } // 0..1
+    /// <summary>明度（0-1）</summary>
     public double V { get; } // 0..1
 
+    /// <summary>
+    /// HsvColorのインスタンスを初期化する
+    /// </summary>
+    /// <param name="h">色相（0-360度）</param>
+    /// <param name="s">彩度（0-1）</param>
+    /// <param name="v">明度（0-1）</param>
     private HsvColor(double h, double s, double v)
     {
         H = NormalizeHue(h);
@@ -16,8 +28,20 @@ public readonly struct HsvColor
         V = Clamp01(v);
     }
 
+    /// <summary>
+    /// HSV値からHsvColorを作成する
+    /// </summary>
+    /// <param name="h">色相（0-360度）</param>
+    /// <param name="s">彩度（0-1）</param>
+    /// <param name="v">明度（0-1）</param>
+    /// <returns>HsvColorインスタンス</returns>
     public static HsvColor FromHsv(double h, double s, double v) => new(h, s, v);
 
+    /// <summary>
+    /// ColorからHsvColorに変換する
+    /// </summary>
+    /// <param name="c">変換元のColor</param>
+    /// <returns>変換されたHsvColor</returns>
     public static HsvColor FromColor(Color c)
     {
         double r = c.R / 255.0;
@@ -46,6 +70,11 @@ public readonly struct HsvColor
         return new HsvColor(h, s, v);
     }
 
+    /// <summary>
+    /// HsvColorをColorに変換する
+    /// </summary>
+    /// <param name="alpha">アルファ値（0-1）</param>
+    /// <returns>変換されたColor</returns>
     public Color ToColor(double alpha)
     {
         alpha = Clamp01(alpha);
@@ -70,6 +99,11 @@ public readonly struct HsvColor
         return Color.FromArgb(A, R, G, B);
     }
 
+    /// <summary>
+    /// 色相を0-360度の範囲に正規化する
+    /// </summary>
+    /// <param name="h">元の色相値</param>
+    /// <returns>正規化された色相値</returns>
     private static double NormalizeHue(double h)
     {
         if (double.IsNaN(h) || double.IsInfinity(h)) return 0;
@@ -78,6 +112,11 @@ public readonly struct HsvColor
         return h;
     }
 
+    /// <summary>
+    /// 値を0-1の範囲にクランプする
+    /// </summary>
+    /// <param name="v">元の値</param>
+    /// <returns>クランプされた値</returns>
     private static double Clamp01(double v)
     {
         if (double.IsNaN(v) || double.IsInfinity(v)) return 0;

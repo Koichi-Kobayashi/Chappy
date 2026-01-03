@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 using Chappy.Wpf.Controls.Uitl;
@@ -6,12 +6,21 @@ using Chappy.Wpf.Controls.Uitl;
 namespace Chappy.Wpf.Controls.ColorPicker.Converter;
 
 /// <summary>
-/// values[0] : SelectedColor (Color)
-/// values[1] : Alpha slider value (double 0..1)
-/// parameter : 背景色 "#FFFFFFFF" など
+/// 複数の値を組み合わせてアルファブレンドした16進数文字列に変換するコンバーター
+/// values[0]: SelectedColor (Color)
+/// values[1]: Alpha slider value (double 0..1)
+/// parameter: 背景色 "#FFFFFFFF" など
 /// </summary>
 public sealed class ColorAlphaBlendToHexMultiConverter : IMultiValueConverter
 {
+    /// <summary>
+    /// 複数の値を組み合わせてアルファブレンドした16進数文字列に変換する
+    /// </summary>
+    /// <param name="values">変換元の値の配列（ColorとAlpha値）</param>
+    /// <param name="targetType">変換先の型</param>
+    /// <param name="parameter">背景色（"#FFFFFFFF"などの文字列形式）</param>
+    /// <param name="culture">カルチャー情報</param>
+    /// <returns>16進数文字列（"#FFRRGGBB"形式）</returns>
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
     {
         if (values.Length < 2)
@@ -40,6 +49,9 @@ public sealed class ColorAlphaBlendToHexMultiConverter : IMultiValueConverter
         return $"#FF{r:X2}{g:X2}{b:X2}";
     }
 
+    /// <summary>
+    /// 逆変換はサポートされていません
+    /// </summary>
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 
