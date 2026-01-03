@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>
@@ -13,6 +13,19 @@
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- NuGet Package Metadata -->
+    <PackageId>Chappy.Wpf.Controls</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Chappy</Authors>
+    <Company>Chappy</Company>
+    <Description>WPF用のカスタムコントロールライブラリ。カラーピッカー、ボックス選択機能付きDataGrid、シェルコンテキストメニューなどを提供します。</Description>
+    <PackageTags>WPF;Controls;ColorPicker;DataGrid;ContextMenu</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
