@@ -365,7 +365,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="54" />
                                 <!--  RGB (#RRGGBB)  -->
-                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="98" />
                             </Grid.ColumnDefinitions>
 
                             <TextBlock
@@ -409,6 +409,7 @@
                             <!--  RGB (#RRGGBB)  -->
                             <TextBox
                                 Grid.Column="3"
+                                Width="98"
                                 Height="22"
                                 Margin="8,0,0,0"
                                 Padding="8,0"
@@ -507,6 +508,7 @@
                             <TextBox
                                 Grid.Column="2"
                                 Height="24"
+                                Padding="8,0"
                                 VerticalContentAlignment="Center"
                                 Text="{Binding R, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, Converter={StaticResource ByteConverter}, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -551,6 +553,7 @@
                                 Grid.Row="2"
                                 Grid.Column="2"
                                 Height="24"
+                                Padding="8,0"
                                 VerticalContentAlignment="Center"
                                 Text="{Binding G, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, Converter={StaticResource ByteConverter}, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -595,6 +598,7 @@
                                 Grid.Row="4"
                                 Grid.Column="2"
                                 Height="24"
+                                Padding="8,0"
                                 VerticalContentAlignment="Center"
                                 Text="{Binding B, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, Converter={StaticResource ByteConverter}, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
@@ -606,7 +610,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="54" />
                                 <!--  RGB (#RRGGBB)  -->
-                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="98" />
                             </Grid.ColumnDefinitions>
 
                             <TextBlock
@@ -669,6 +673,7 @@
                             <!--  RGBA (#AARRGGBB)  -->
                             <TextBox
                                 Grid.Column="3"
+                                Width="98"
                                 Height="22"
                                 Margin="6,0,0,0"
                                 Padding="8,0"
