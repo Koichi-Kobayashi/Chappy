@@ -221,44 +221,52 @@ public static class BoxSelectBehavior
     /// </summary>
     /// <param name="grid">対象のDataGrid</param>
     /// <param name="s">内部状態</param>
-    /// <param name="rect">選択範囲の矩形</param>
+    /// <param name="selectionRect">選択範囲の矩形</param>
     /// <param name="mods">押下されている修飾キー</param>
     private static void ApplySelection(
         System.Windows.Controls.DataGrid grid,
         State s,
-        Rect rect,
+        Rect selectionRect,
         ModifierKeys mods)
     {
         if (grid.Items.Count == 0) return;
 
         bool append = mods.HasFlag(ModifierKeys.Control);
 
-        double rowHeight = grid.RowHeight;
-        if (double.IsNaN(rowHeight) || rowHeight <= 0) return;
+        // 固定行高を取得（RowHeight が NaN の場合もここで弾く）
+        double rh = GetFixedRowHeight(grid);
+        if (rh <= 0.0) return;
 
-        double header = GetHeaderHeight(grid);
+        // 行領域の上端（ヘッダー分を除外）
+        double headerHeight = GetHeaderHeight(grid);
+        double y1 = selectionRect.Top - headerHeight;
+        double y2 = selectionRect.Bottom - headerHeight;
 
-        double y1 = rect.Top - header;
-        double y2 = rect.Bottom - header;
+        // いま画面に見えている先頭行 index を推定
+        int firstVisibleIndex = EstimateFirstVisibleIndex(grid, rh);
 
-        int firstVisible = EstimateFirstVisibleIndex(grid, rowHeight);
+        // 表示領域内の y を行番号に変換（y=0 が firstVisibleIndex の行の上端）
+        int start = firstVisibleIndex + (int)Math.Floor(Math.Min(y1, y2) / rh);
+        int end = firstVisibleIndex + (int)Math.Floor(Math.Max(y1, y2) / rh);
 
-        int start = firstVisible + (int)Math.Floor(Math.Min(y1, y2) / rowHeight);
-        int end = firstVisible + (int)Math.Floor(Math.Max(y1, y2) / rowHeight);
-
+        // 範囲をクランプ
         start = Math.Max(0, Math.Min(start, grid.Items.Count - 1));
         end = Math.Max(0, Math.Min(end, grid.Items.Count - 1));
         if (end < start) (start, end) = (end, start);
 
+        // 変化なしなら何もしない
         if (start == s.LastStart && end == s.LastEnd) return;
 
         s.LastStart = start;
         s.LastEnd = end;
 
+        // 置き換え選択 / Ctrlで追加選択
         grid.SelectedItems.Clear();
         if (append)
-            foreach (var x in s.BaselineSelection)
-                grid.SelectedItems.Add(x);
+        {
+            foreach (var obj in s.BaselineSelection)
+                grid.SelectedItems.Add(obj);
+        }
 
         for (int i = start; i <= end; i++)
         {
@@ -266,6 +274,28 @@ public static class BoxSelectBehavior
             if (!grid.SelectedItems.Contains(item))
                 grid.SelectedItems.Add(item);
         }
+
+        // “選択が見えない”問題を避ける（任意）
+        if (grid.SelectedItems.Count > 0 && grid.CurrentCell.Item == null)
+            grid.CurrentCell = new DataGridCellInfo(grid.Items[start], grid.Columns.FirstOrDefault());
+    }
+
+    /// <summary>
+    /// 指定されたDataGridに対して設定されている固定行高さを取得します（設定されている場合）。
+    /// </summary>
+    /// <remarks>このメソッドは、RowStyleを介して設定された行の高さの値を考慮しません。一貫した結果を得るには、
+    /// DataGrid上で直接RowHeightプロパティを指定してください。</remarks>
+    /// <param name="grid">固定行高さを取得するDataGrid。</param>
+    /// <returns>RowHeightプロパティの値が正の数に設定されている場合の値。それ以外の場合は-1。</returns>
+    private static double GetFixedRowHeight(System.Windows.Controls.DataGrid grid)
+    {
+        // RowHeight > 0 を固定値として使う（NaNはダメ）
+        if (!double.IsNaN(grid.RowHeight) && grid.RowHeight > 0)
+            return grid.RowHeight;
+
+        // RowStyle で Height を固定していても取りに行かない（重い＆不確実）
+        // 原則 RowHeight を指定してください
+        return -1;
     }
 
     // =========================
@@ -285,8 +315,14 @@ public static class BoxSelectBehavior
             {
                 var p = row.TranslatePoint(new Point(0, 0), grid);
                 double header = GetHeaderHeight(grid);
-                int delta = (int)Math.Round((p.Y - header) / rowHeight);
-                return Math.Max(0, i - delta);
+
+                double yInRowsArea = p.Y - header;
+                int delta = (int)Math.Round(yInRowsArea / rowHeight);
+
+                int first = i - delta;
+                if (first < 0) first = 0;
+                if (first >= grid.Items.Count) first = grid.Items.Count - 1;
+                return first;
             }
         }
         return 0;
