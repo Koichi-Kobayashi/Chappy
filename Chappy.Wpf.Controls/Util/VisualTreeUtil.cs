@@ -19,25 +19,44 @@ namespace Chappy.Wpf.Controls.Util
         {
             while (d != null)
             {
-                if (d is T t)
-                    return t;
+                if (d is T t) return t;
 
-                // LogicalTree（Run / TextElement 対策）
-                if (d is FrameworkContentElement fce && fce.Parent is DependencyObject p1)
+                // FrameworkContentElement（Run/TextElement等）
+                if (d is System.Windows.FrameworkContentElement fce && fce.Parent is DependencyObject pFce)
                 {
-                    d = p1;
+                    d = pFce;
                     continue;
                 }
 
-                var logical = LogicalTreeHelper.GetParent(d);
-                if (logical != null)
+                // Visual を優先
+                var visualParent = VisualTreeHelper.GetParent(d);
+                if (visualParent != null)
                 {
-                    d = logical;
+                    d = visualParent;
                     continue;
                 }
 
-                // VisualTree
-                d = VisualTreeHelper.GetParent(d);
+                // Visual が取れない時だけ Logical
+                d = LogicalTreeHelper.GetParent(d);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 指定されてた DependencyObject から子方向にたどって、
+        /// 最初に見つかった指定型の要素を返す
+        /// </summary>
+        public static T? FindDescendant<T>(DependencyObject d) where T : DependencyObject
+        {
+            if (d == null) return null;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+            {
+                var child = VisualTreeHelper.GetChild(d, i);
+                if (child is T t) return t;
+
+                var found = FindDescendant<T>(child);
+                if (found != null) return found;
             }
             return null;
         }
