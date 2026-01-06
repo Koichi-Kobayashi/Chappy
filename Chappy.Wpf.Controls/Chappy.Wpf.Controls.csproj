@@ -1,36 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>
-      net48;
-      net6.0-windows;
-      net7.0-windows;
-      net8.0-windows;
-      net9.0-windows;
-      net10.0-windows
-    </TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <UseWPF>true</UseWPF>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>Chappy.Wpf.Controls</AssemblyName>
+	<PropertyGroup>
+		<TargetFrameworks>net48;net6.0-windows;net7.0-windows;net8.0-windows;net9.0-windows;net10.0-windows</TargetFrameworks>
+		<LangVersion>latest</LangVersion>
+		<Nullable>enable</Nullable>
+		<UseWPF>true</UseWPF>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyName>Chappy.Wpf.Controls</AssemblyName>
 
-	<!-- NuGet Package Metadata -->
-    <PackageId>Chappy.Wpf.Controls</PackageId>
-    <Version>1.0.4</Version>
-    <Authors>Chappy</Authors>
-    <Company>Chappy</Company>
-    <Description>WPF用のカスタムコントロールライブラリ。カラーピッカー、ボックス選択機能付きDataGrid、シェルコンテキストメニューなどを提供します。</Description>
-    <PackageTags>WPF;Controls;ColorPicker;DataGrid;ContextMenu</PackageTags>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-  </PropertyGroup>
+		<PackageId>Chappy.Wpf.Controls</PackageId>
+		<Version>1.0.5</Version>
+		<Authors>Koichi-Kobayashi</Authors>
+		<Company>Chappy</Company>
+		<Description>WPF用のカスタムコントロールライブラリ。カラーピッカー、ボックス選択機能付きDataGrid、シェルコンテキストメニューなどを提供します。</Description>
+		<PackageTags>WPF;Controls;ColorPicker;DataGrid;ContextMenu</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
-  </ItemGroup>
+		<RepositoryUrl>https://github.com/Koichi-Kobayashi/Chappy</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageProjectUrl>https://github.com/Koichi-Kobayashi/Chappy</PackageProjectUrl>
+
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<EmbedUntrackedSources>true</EmbedUntrackedSources>
+
+		<ReadmeFile>README.md</ReadmeFile>
+
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="README.md" Pack="true" PackagePath="/" />
+	</ItemGroup>
 
 </Project>

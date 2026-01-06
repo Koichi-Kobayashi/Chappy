@@ -1,5 +1,3 @@
-[English](README.md) | [日本語](README.ja.md)
-
 # Chappy.Wpf.Controls
 
 A WPF custom controls library for Windows desktop applications.
@@ -42,3 +40,23 @@ After installing the package, reference it in your WPF project and use the provi
 
 Some controls may require additional setup (styles, behaviors, or initialization).
 Please refer to the source code and samples for detailed usage.
+
+## Source Code
+
+This package is part of the Chappy repository.
+
+Source location for this package:
+https://github.com/Koichi-Kobayashi/Chappy/tree/main/Chappy.Wpf.Controls
+
+Repository root:
+https://github.com/Koichi-Kobayashi/Chappy
+
+## License
+
+MIT License
+
+## Notes
+
+This package is actively developed and may evolve.
+APIs may change before reaching a stable major version.
+Feedback and contributions are welcome via GitHub issues or pull requests.
