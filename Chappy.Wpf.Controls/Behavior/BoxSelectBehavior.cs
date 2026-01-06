@@ -1,4 +1,5 @@
 #nullable enable
+using Chappy.Wpf.Controls.Util;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,6 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Chappy.Wpf.Controls.Behaviors;
 
@@ -42,6 +44,64 @@ public static class BoxSelectBehavior
     public static bool GetIsEnabled(DependencyObject d)
         => (bool)d.GetValue(IsEnabledProperty);
 
+
+    public static readonly DependencyProperty DragDataFormatProperty =
+    DependencyProperty.RegisterAttached(
+        "DragDataFormat",
+        typeof(string),
+        typeof(BoxSelectBehavior),
+        new PropertyMetadata("Chappy.DataGrid.SelectedItems"));
+
+    public static void SetDragDataFormat(DependencyObject d, string v)
+        => d.SetValue(DragDataFormatProperty, v);
+
+    public static string GetDragDataFormat(DependencyObject d)
+        => (string)d.GetValue(DragDataFormatProperty);
+
+    public static readonly DependencyProperty DragEffectsProperty =
+        DependencyProperty.RegisterAttached(
+            "DragEffects",
+            typeof(DragDropEffects),
+            typeof(BoxSelectBehavior),
+            new PropertyMetadata(DragDropEffects.Copy | DragDropEffects.Move));
+
+    public static void SetDragEffects(DependencyObject d, DragDropEffects v)
+        => d.SetValue(DragEffectsProperty, v);
+
+    public static DragDropEffects GetDragEffects(DependencyObject d)
+        => (DragDropEffects)d.GetValue(DragEffectsProperty);
+
+    /// <summary>
+    /// ドラッグ開始直前に呼ばれるコマンド（任意）
+    /// CommandParameter: DragStartInfo
+    /// CanExecute=false ならドラッグを開始しない
+    /// </summary>
+    public static readonly DependencyProperty DragStartingCommandProperty =
+        DependencyProperty.RegisterAttached(
+            "DragStartingCommand",
+            typeof(ICommand),
+            typeof(BoxSelectBehavior),
+            new PropertyMetadata(null));
+
+    public static void SetDragStartingCommand(DependencyObject d, ICommand? v)
+        => d.SetValue(DragStartingCommandProperty, v);
+
+    public static ICommand? GetDragStartingCommand(DependencyObject d)
+        => (ICommand?)d.GetValue(DragStartingCommandProperty);
+
+    public sealed class DragStartInfo
+    {
+        public IReadOnlyList<object> Items { get; }
+        public DataObject Data { get; }
+
+        public DragStartInfo(IReadOnlyList<object> items, DataObject data)
+        {
+            Items = items;
+            Data = data;
+        }
+    }
+
+
     // =========================
     // 内部状態（DataGridごと）
     // =========================
@@ -66,6 +126,17 @@ public static class BoxSelectBehavior
         public AdornerLayer? AdornerLayer;
         /// <summary>選択範囲を表示するためのAdorner</summary>
         public SelectionAdorner? Adorner;
+
+        /// <summary>複数選択維持ドラッグの候補状態</summary>
+        public bool DragCandidate;
+        /// <summary>その時の押下位置</summary>
+        public Point DragCandidateStart;
+        /// <summary>DoDragDrop 中のガード（再入防止）</summary>
+        public bool DraggingDnD;
+        /// <summary押下した行が選択済みか</summary>
+        public bool DragCandidateWasSelected;
+        /// <summary>名前編集中か</summary>
+        public bool IsRenaming;
     }
 
     /// <summary>
@@ -112,6 +183,13 @@ public static class BoxSelectBehavior
             grid.PreviewMouseMove += OnMove;
             grid.PreviewMouseLeftButtonUp += OnLeftUp;
             grid.LostMouseCapture += OnLostCapture;
+
+            grid.SelectionChanged += OnSelectionChanged;
+            grid.CurrentCellChanged += OnCurrentCellChanged;
+            grid.LostKeyboardFocus += OnLostKeyboardFocus;
+
+            grid.CellEditEnding += OnCellEditEnding;
+            grid.RowEditEnding += OnRowEditEnding;
         }
         else
         {
@@ -119,7 +197,92 @@ public static class BoxSelectBehavior
             grid.PreviewMouseMove -= OnMove;
             grid.PreviewMouseLeftButtonUp -= OnLeftUp;
             grid.LostMouseCapture -= OnLostCapture;
+
+            grid.SelectionChanged -= OnSelectionChanged;
+            grid.CurrentCellChanged -= OnCurrentCellChanged;
+            grid.LostKeyboardFocus -= OnLostKeyboardFocus;
+
+            grid.CellEditEnding -= OnCellEditEnding;
+            grid.RowEditEnding -= OnRowEditEnding;
         }
+    }
+
+    public static void RequestRename(System.Windows.Controls.DataGrid grid)
+    {
+        if (grid.SelectedItem == null) return;
+        if (grid.IsReadOnly) return;
+
+        var s = GetState(grid);
+
+        if (grid.BeginEdit())
+        {
+            GetState(grid).IsRenaming = true;
+        }
+
+        grid.Dispatcher.InvokeAsync(() =>
+        {
+            grid.Focus();
+            grid.ScrollIntoView(grid.SelectedItem, grid.CurrentCell.Column);
+
+            // BeginEdit の直前に古い編集を閉じる
+            CommitRenameIfNeeded(grid);
+
+            if (grid.BeginEdit())
+            {
+                s.IsRenaming = true; // ★ここ
+            }
+        }, DispatcherPriority.Input);
+    }
+    private static void CommitRenameIfNeeded(System.Windows.Controls.DataGrid grid)
+    {
+        var s = GetState(grid);
+        if (!s.IsRenaming) return;
+
+        // Cell → Row の順でコミット（WPFの定石）
+        grid.CommitEdit(DataGridEditingUnit.Cell, true);
+        grid.CommitEdit(DataGridEditingUnit.Row, true);
+
+        s.IsRenaming = false;
+    }
+
+    private static void CancelRenameIfNeeded(System.Windows.Controls.DataGrid grid)
+    {
+        var s = GetState(grid);
+        if (!s.IsRenaming) return;
+
+        grid.CancelEdit(DataGridEditingUnit.Cell);
+        grid.CancelEdit(DataGridEditingUnit.Row);
+
+        s.IsRenaming = false;
+    }
+    private static void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+            CommitRenameIfNeeded(grid);
+    }
+
+    private static void OnCurrentCellChanged(object? sender, EventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+            CommitRenameIfNeeded(grid);
+    }
+
+    private static void OnLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+            CommitRenameIfNeeded(grid);
+    }
+
+    private static void OnCellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+            GetState(grid).IsRenaming = false;
+    }
+
+    private static void OnRowEditEnding(object sender, DataGridRowEditEndingEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid)
+            GetState(grid).IsRenaming = false;
     }
 
     // =========================
@@ -138,7 +301,42 @@ public static class BoxSelectBehavior
 
         var s = GetState(grid);
 
-        // ★ここでは何も奪わない（通常クリックを生かす）
+        s.DragCandidate = false;
+        s.DraggingDnD = false;
+        s.DragCandidateWasSelected = false;
+
+        var row = Chappy.Wpf.Controls.Util.VisualTreeUtil
+            .FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+
+        // ★ 行の上で押した場合：D&D を優先（1件でも）
+        if (row != null)
+        {
+            s.DragCandidate = true;
+            s.DragCandidateStart = e.GetPosition(grid);
+            s.DragCandidateWasSelected = row.IsSelected;
+
+            // 複数選択のとき、選択済み行を押したら “単一選択に潰す” のを防ぐ
+            if (row.IsSelected && grid.SelectedItems.Count > 1 && Keyboard.Modifiers == ModifierKeys.None)
+            {
+                e.Handled = true;
+                grid.Focus();
+                return;
+            }
+
+            // 1件選択の場合は DataGrid の通常クリックに任せる（選択更新は必要）
+            // ただし DragCandidate は立ってるので Move で D&D に入る
+            s.DragStart = null;      // ★矩形選択を開始させない
+            s.IsDragging = false;
+
+            // baseline は更新しておく（Ctrl矩形のため）
+            s.BaselineSelection.Clear();
+            foreach (var x in grid.SelectedItems.Cast<object>())
+                s.BaselineSelection.Add(x);
+
+            return;
+        }
+
+        // ★ 背景（行以外）を押した場合：矩形選択
         s.DragStart = e.GetPosition(grid);
         s.IsDragging = false;
 
@@ -158,26 +356,88 @@ public static class BoxSelectBehavior
         if (sender is not System.Windows.Controls.DataGrid grid) return;
 
         var s = GetState(grid);
+
+        // 1件選択の場合でも、選択行からのドラッグは D&D を優先
+        // ※ クリックで行が選択されるのを待つため、ここで最新の選択数を見る
+        if (grid.SelectedItems.Count == 0)
+        {
+            s.DraggingDnD = false;
+            return;
+        }
+
+        // ★ 複数選択維持のドラッグ開始（Explorer風）
+        if (s.DragCandidate && !s.DraggingDnD)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                s.DragCandidate = false;
+                return;
+            }
+
+            var pos = e.GetPosition(grid);
+            if (Math.Abs(pos.X - s.DragCandidateStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos.Y - s.DragCandidateStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            // ここで D&D 開始（BoxSelect は開始しない）
+            s.DraggingDnD = true;
+            s.DragCandidate = false;
+
+            var items = grid.SelectedItems.Cast<object>().ToList();
+            var data = new DataObject();
+
+            // 既定フォーマットで “選択アイテム配列” を載せる
+            data.SetData(GetDragDataFormat(grid), items);
+
+            // もし items が string パスなら FileDrop も積む（便利）
+            if (items.Count > 0 && items.All(x => x is string))
+            {
+                var arr = items.Cast<string>().ToArray();
+                data.SetData(DataFormats.FileDrop, arr);
+            }
+
+            var info = new DragStartInfo(items, data);
+            var cmd = GetDragStartingCommand(grid);
+
+            // 外部コマンドがあれば、CanExecute=false でキャンセル可能
+            if (cmd != null && !cmd.CanExecute(info))
+            {
+                s.DraggingDnD = false;
+                return;
+            }
+            cmd?.Execute(info);
+
+            try
+            {
+                DragDrop.DoDragDrop(grid, data, GetDragEffects(grid));
+            }
+            finally
+            {
+                s.DraggingDnD = false;
+            }
+
+            e.Handled = true;
+            return;
+        }
+
+        // ---- 以降、従来の BoxSelect 処理（あなたの既存コード） ----
         if (s.DragStart is null) return;
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
-        var pos = e.GetPosition(grid);
+        var pos2 = e.GetPosition(grid);
 
         if (!s.IsDragging)
         {
-            if (Math.Abs(pos.X - s.DragStart.Value.X) <
-                    SystemParameters.MinimumHorizontalDragDistance &&
-                Math.Abs(pos.Y - s.DragStart.Value.Y) <
-                    SystemParameters.MinimumVerticalDragDistance)
+            if (Math.Abs(pos2.X - s.DragStart.Value.X) < SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(pos2.Y - s.DragStart.Value.Y) < SystemParameters.MinimumVerticalDragDistance)
                 return;
 
-            // ★ドラッグ確定
             s.IsDragging = true;
             grid.CaptureMouse();
             EnsureAdorner(grid, s);
         }
 
-        var rect = MakeRect(s.DragStart.Value, pos);
+        var rect = MakeRect(s.DragStart.Value, pos2);
         s.Adorner?.Update(rect);
 
         ApplySelection(grid, s, rect, Keyboard.Modifiers);
@@ -189,6 +449,10 @@ public static class BoxSelectBehavior
         if (sender is not System.Windows.Controls.DataGrid grid) return;
 
         var s = GetState(grid);
+
+        // 候補状態解除（順番重要）
+        s.DragCandidate = false;
+
         if (!s.IsDragging)
         {
             s.DragStart = null;

@@ -20,6 +20,10 @@ using System.Windows.Markup;
     "http://schemas.chappy.dev/wpf/controls",
     "Chappy.Wpf.Controls.ContextMenu")]
 
+[assembly: XmlnsDefinition(
+    "http://schemas.chappy.dev/wpf/controls",
+    "Chappy.Wpf.Controls.DataGrid")]
+
 // „§FXAML ‚Å‚ÌŠù’è prefix
 [assembly: XmlnsPrefix(
     "http://schemas.chappy.dev/wpf/controls",
