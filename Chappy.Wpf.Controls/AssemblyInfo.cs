@@ -1,4 +1,4 @@
-using System.Windows;
+ï»¿using System.Windows;
 using System.Windows.Markup;
 
 [assembly: ThemeInfo(
@@ -11,7 +11,7 @@ using System.Windows.Markup;
 )]
 
 
-// 1‚Â‚Ì xmlns ‚ÉW–ñ
+// 1ã¤ã® xmlns ã«é›†ç´„
 [assembly: XmlnsDefinition(
     "http://schemas.chappy.dev/wpf/controls",
     "Chappy.Wpf.Controls.ColorPicker")]
@@ -24,7 +24,11 @@ using System.Windows.Markup;
     "http://schemas.chappy.dev/wpf/controls",
     "Chappy.Wpf.Controls.DataGrid")]
 
-// „§FXAML ‚Å‚ÌŠù’è prefix
+[assembly: XmlnsDefinition(
+    "http://schemas.chappy.dev/wpf/controls",
+    "Chappy.Wpf.Controls.Behaviors")]
+
+// æ¨å¥¨ï¼šXAML ã§ã®æ—¢å®š prefix
 [assembly: XmlnsPrefix(
     "http://schemas.chappy.dev/wpf/controls",
     "chappy")]
