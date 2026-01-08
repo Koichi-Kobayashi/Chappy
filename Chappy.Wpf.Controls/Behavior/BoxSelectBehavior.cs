@@ -60,12 +60,14 @@ public static class BoxSelectBehavior
             grid.PreviewMouseLeftButtonDown += OnDown;
             grid.PreviewMouseMove += OnMove;
             grid.PreviewMouseLeftButtonUp += OnUp;
+            grid.MouseLeave += OnLeave;
         }
         else
         {
             grid.PreviewMouseLeftButtonDown -= OnDown;
             grid.PreviewMouseMove -= OnMove;
             grid.PreviewMouseLeftButtonUp -= OnUp;
+            grid.MouseLeave -= OnLeave;
         }
     }
 
@@ -106,12 +108,71 @@ public static class BoxSelectBehavior
             }
         }
 
-        s.Adorner?.Update(new Rect(s.DragStart.Value, pos));
+        var selectionRect = new Rect(s.DragStart.Value, pos);
+        s.Adorner?.Update(selectionRect);
+        
+        // 矩形選択の範囲内の行を選択
+        UpdateSelection(grid, selectionRect);
     }
 
     private static void OnUp(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        var s = GetState(grid);
+        
+        // 最終的な選択を確定
+        if (s.DragStart != null && s.IsDragging)
+        {
+            var pos = e.GetPosition(grid);
+            var selectionRect = new Rect(s.DragStart.Value, pos);
+            UpdateSelection(grid, selectionRect);
+        }
+        
+        ClearSelection(grid);
+    }
+
+    private static void OnLeave(object sender, MouseEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.DataGrid grid) return;
+        var s = GetState(grid);
+        // ドラッグ中の場合のみクリア（通常のマウス移動ではクリアしない）
+        if (s.IsDragging)
+        {
+            ClearSelection(grid);
+        }
+    }
+
+    private static void UpdateSelection(System.Windows.Controls.DataGrid grid, Rect selectionRect)
+    {
+        var selectedItems = new HashSet<object>();
+        
+        // DataGridのすべての行を列挙
+        for (int i = 0; i < grid.Items.Count; i++)
+        {
+            var row = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(i);
+            if (row == null) continue;
+            
+            // 行のBoundsを取得
+            var rowBounds = row.TransformToAncestor(grid).TransformBounds(
+                new Rect(0, 0, row.ActualWidth, row.ActualHeight));
+            
+            // 矩形選択の範囲と交差するかチェック
+            if (selectionRect.IntersectsWith(rowBounds))
+            {
+                selectedItems.Add(row.Item);
+            }
+        }
+        
+        // 選択を更新
+        grid.SelectedItems.Clear();
+        foreach (var item in selectedItems)
+        {
+            grid.SelectedItems.Add(item);
+        }
+    }
+
+    public static void ClearSelection(System.Windows.Controls.DataGrid grid)
+    {
         var s = GetState(grid);
 
         if (s.Layer != null && s.Adorner != null)

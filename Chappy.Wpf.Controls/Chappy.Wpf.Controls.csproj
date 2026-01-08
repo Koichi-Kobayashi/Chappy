@@ -9,7 +9,7 @@
 		<AssemblyName>Chappy.Wpf.Controls</AssemblyName>
 
 		<PackageId>Chappy.Wpf.Controls</PackageId>
-		<Version>1.0.7</Version>
+		<Version>1.0.8</Version>
 		<Authors>Koichi-Kobayashi</Authors>
 		<Company>Chappy</Company>
 		<Description>WPF用のカスタムコントロールライブラリ。カラーピッカー、ボックス選択機能付きDataGrid、シェルコンテキストメニューなどを提供します。</Description>

@@ -31,6 +31,9 @@
         <DataGrid
             Grid.Column="1"
             behaviors:BoxSelectBehavior.IsEnabled="True"
+            behaviors:DataGridDragDropBehavior.BuildPayload="{Binding BuildDragPayload}"
+            behaviors:DataGridDragDropBehavior.DropHandler="{Binding OnDrop}"
+            behaviors:DataGridDragDropBehavior.IsEnabled="True"
             behaviors:DataGridEditGuardBehavior.IsEnabled="True"
             behaviors:ShellContextMenuBehavior.CurrentFolderPath="{Binding CurrentFolder}"
             behaviors:ShellContextMenuBehavior.IsEnabled="True"
