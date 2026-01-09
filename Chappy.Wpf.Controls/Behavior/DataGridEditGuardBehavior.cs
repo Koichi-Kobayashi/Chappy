@@ -123,6 +123,11 @@ public static class DataGridEditGuardBehavior
 
         // ===== 編集中 =====
 
+        // ★TextBoxの削除を自前で実行
+        var src = e.OriginalSource as DependencyObject;
+        var tb = src as TextBox ?? VisualTreeUtil.FindAncestor<TextBox>(src)
+                 ?? FindCurrentEditingTextBox(grid);
+
         if (e.Key == Key.Enter)
         {
             CommitEdit(grid);
@@ -142,11 +147,6 @@ public static class DataGridEditGuardBehavior
             // ★戻るを確実に止める
             e.Handled = true;
 
-            // ★TextBoxの削除を自前で実行
-            var src = e.OriginalSource as DependencyObject;
-            var tb = src as TextBox ?? VisualTreeUtil.FindAncestor<TextBox>(src)
-                     ?? FindCurrentEditingTextBox(grid);
-
             if (tb != null)
             {
                 if (e.Key == Key.Back)
@@ -158,6 +158,41 @@ public static class DataGridEditGuardBehavior
                     DeleteKey(tb);
                 }
             }
+            return;
+        }
+
+        // ←→ / Home / End
+        if (e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Home || e.Key == Key.End)
+        {
+            e.Handled = true;
+
+            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+
+            int target = tb.CaretIndex;
+
+            if (e.Key == Key.Home)
+            {
+                target = 0;
+            }
+            else if (e.Key == Key.End)
+            {
+                target = tb.Text?.Length ?? 0;
+            }
+            else if (e.Key == Key.Left)
+            {
+                target = ctrl
+                    ? FindPrevWordBoundary(tb.Text ?? "", tb.CaretIndex)
+                    : Math.Max(0, tb.CaretIndex - 1);
+            }
+            else if (e.Key == Key.Right)
+            {
+                target = ctrl
+                    ? FindNextWordBoundary(tb.Text ?? "", tb.CaretIndex)
+                    : Math.Min((tb.Text?.Length ?? 0), tb.CaretIndex + 1);
+            }
+
+            MoveCaret(tb, target, extendSelection: shift, direction: e.Key);
             return;
         }
     }
@@ -227,6 +262,114 @@ public static class DataGridEditGuardBehavior
         // Delete は基本「その場」に残る（左に寄せない）
         tb.CaretIndex = i;
     }
+
+    #region キャレット移動＋選択処理（Shift対応）
+
+    /// <summary>
+    /// キャレット移動＋選択処理（Shift対応）
+    /// Shiftなし：選択があれば「左右キーの方向に合わせて」選択を畳む（Explorerっぽい挙動）
+    /// Shiftあり：選択範囲を伸縮
+    /// </summary>
+    private static void MoveCaret(TextBox tb, int target, bool extendSelection, Key direction)
+    {
+        int len = tb.Text?.Length ?? 0;
+        target = Math.Max(0, Math.Min(len, target));
+
+        if (!extendSelection)
+        {
+            // 選択があれば畳む（←は先頭、→は末尾へ）
+            if (tb.SelectionLength > 0)
+            {
+                if (direction == Key.Left || direction == Key.Home)
+                    tb.CaretIndex = tb.SelectionStart;
+                else
+                    tb.CaretIndex = tb.SelectionStart + tb.SelectionLength;
+
+                tb.SelectionLength = 0;
+                return;
+            }
+
+            tb.CaretIndex = target;
+            tb.SelectionLength = 0;
+            return;
+        }
+
+        // Shiftあり：範囲選択を伸ばす
+        int caret = tb.CaretIndex;
+
+        // “アンカー”を推定
+        // 選択中で caret が SelectionStart にいるなら、反対側がアンカー
+        int anchor = caret;
+        if (tb.SelectionLength > 0)
+        {
+            anchor = (caret == tb.SelectionStart)
+                ? tb.SelectionStart + tb.SelectionLength
+                : tb.SelectionStart;
+        }
+
+        // 先に caret を target に動かしてから selection を作り直す
+        tb.CaretIndex = target;
+
+        int start = Math.Min(anchor, target);
+        int end = Math.Max(anchor, target);
+
+        tb.SelectionStart = start;
+        tb.SelectionLength = end - start;
+    }
+
+    #endregion
+
+    #region Ctrl+← / Ctrl+→ の単語境界（簡易版）
+
+    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+    private static int FindPrevWordBoundary(string text, int index)
+    {
+        index = Math.Max(0, Math.Min(text.Length, index));
+        if (index == 0) return 0;
+
+        int i = index;
+
+        // まず左側の空白を飛ばす
+        while (i > 0 && char.IsWhiteSpace(text[i - 1])) i--;
+
+        // 次に単語/記号の塊を飛ばす
+        bool word = (i > 0) && IsWordChar(text[i - 1]);
+        while (i > 0)
+        {
+            char c = text[i - 1];
+            if (char.IsWhiteSpace(c)) break;
+            if (IsWordChar(c) != word) break;
+            i--;
+        }
+        return i;
+    }
+
+    private static int FindNextWordBoundary(string text, int index)
+    {
+        index = Math.Max(0, Math.Min(text.Length, index));
+        if (index >= text.Length) return text.Length;
+
+        int i = index;
+
+        // 現在位置の塊（単語/記号）を飛ばす
+        bool word = IsWordChar(text[i]);
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (char.IsWhiteSpace(c)) break;
+            if (IsWordChar(c) != word) break;
+            i++;
+        }
+
+        // 次の空白を飛ばして、次の塊の先頭へ
+        while (i < text.Length && char.IsWhiteSpace(text[i])) i++;
+
+        return i;
+    }
+
+    #endregion
+
     private static void CancelEdit(System.Windows.Controls.DataGrid grid)
     {
         var s = GetState(grid);
