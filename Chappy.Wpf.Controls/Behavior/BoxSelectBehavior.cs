@@ -90,6 +90,16 @@ public static class BoxSelectBehavior
         var s = GetState(grid);
         if (s.DragStart == null || e.LeftButton != MouseButtonState.Pressed) return;
 
+        // イベントが既に処理済みの場合は何もしない（DataGridDragDropBehaviorがドラッグを開始した場合）
+        if (e.Handled) return;
+
+        // 行上でマウスが動いている場合は矩形選択を無効化（行上でのドラッグ開始を優先）
+        if (VisualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+        {
+            // 行上でのドラッグ開始の可能性があるため、矩形選択を無効化
+            return;
+        }
+
         var pos = e.GetPosition(grid);
         if (!s.IsDragging)
         {
