@@ -104,7 +104,7 @@ public static class DataGridEditGuardBehavior
         }
     }
 
-    #region 
+    #region キー操作
 
     private static void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -137,7 +137,7 @@ public static class DataGridEditGuardBehavior
             return;
         }
 
-        if (e.Key == Key.Back)
+        if (e.Key == Key.Back || e.Key == Key.Delete)
         {
             // ★戻るを確実に止める
             e.Handled = true;
@@ -149,7 +149,14 @@ public static class DataGridEditGuardBehavior
 
             if (tb != null)
             {
-                DeleteBackspace(tb);
+                if (e.Key == Key.Back)
+                {
+                    DeleteBackspace(tb);
+                }
+                else
+                {
+                    DeleteKey(tb);
+                }
             }
             return;
         }
@@ -171,6 +178,9 @@ public static class DataGridEditGuardBehavior
         return VisualTreeUtil.FindDescendant<TextBox>(row);
     }
 
+    /// <summary>
+    /// バックスペースで文字削除を行う
+    /// </summary>
     private static void DeleteBackspace(TextBox tb)
     {
         // 選択範囲があればそれを削除
@@ -189,6 +199,33 @@ public static class DataGridEditGuardBehavior
 
         tb.Text = tb.Text.Remove(i - 1, 1);
         tb.CaretIndex = i - 1;
+    }
+    /// <summary>
+    /// Deleteキーで文字削除を行う（キャレット位置の1文字を削除）
+    /// </summary>
+    private static void DeleteKey(TextBox tb)
+    {
+        // 選択範囲があればそれを削除（キャレットは start に置く）
+        if (tb.SelectionLength > 0)
+        {
+            int start = tb.SelectionStart;
+            tb.Text = tb.Text.Remove(start, tb.SelectionLength);
+            tb.SelectionStart = start;
+            tb.SelectionLength = 0;
+            tb.CaretIndex = start;
+            return;
+        }
+
+        int i = tb.CaretIndex;
+
+        // Delete は「末尾」だと削除対象が無い
+        if (i < 0) i = 0;
+        if (i >= tb.Text.Length) return;
+
+        tb.Text = tb.Text.Remove(i, 1);
+
+        // Delete は基本「その場」に残る（左に寄せない）
+        tb.CaretIndex = i;
     }
     private static void CancelEdit(System.Windows.Controls.DataGrid grid)
     {
