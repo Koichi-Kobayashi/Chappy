@@ -125,7 +125,7 @@ public static class DataGridEditGuardBehavior
 
         // ★TextBoxの削除を自前で実行
         var src = e.OriginalSource as DependencyObject;
-        var tb = src as TextBox ?? VisualTreeUtil.FindAncestor<TextBox>(src)
+        var tb = src as TextBox ?? VirtualTreeUtil.FindAncestor<TextBox>(src)
                  ?? FindCurrentEditingTextBox(grid);
 
         if (e.Key == Key.Enter)
@@ -210,7 +210,7 @@ public static class DataGridEditGuardBehavior
         row.ApplyTemplate();
 
         // 行の中のTextBox（編集テンプレ内）
-        return VisualTreeUtil.FindDescendant<TextBox>(row);
+        return VirtualTreeUtil.FindDescendant<TextBox>(row);
     }
 
     /// <summary>
@@ -406,7 +406,7 @@ public static class DataGridEditGuardBehavior
         s.PendingItem = null;
         s.DownPos = e.GetPosition(grid);
 
-        var row = VisualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
         if (row == null) return;
 
         if (!Equals(grid.SelectedItem, row.Item)) return;
@@ -583,7 +583,7 @@ public static class DataGridEditGuardBehavior
         {
             cp.ApplyTemplate();
 
-            var textBox = VisualTreeUtil.FindDescendant<TextBox>(cp);
+            var textBox = VirtualTreeUtil.FindDescendant<TextBox>(cp);
             if (textBox != null)
             {
                 textBox.Dispatcher.BeginInvoke(new Action(() =>

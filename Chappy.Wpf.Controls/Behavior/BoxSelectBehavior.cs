@@ -76,7 +76,7 @@ public static class BoxSelectBehavior
         if (sender is not System.Windows.Controls.DataGrid grid) return;
 
         // 行上なら通常処理
-        if (VisualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+        if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
             return;
 
         var s = GetState(grid);
@@ -94,7 +94,7 @@ public static class BoxSelectBehavior
         if (e.Handled) return;
 
         // 行上でマウスが動いている場合は矩形選択を無効化（行上でのドラッグ開始を優先）
-        if (VisualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+        if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
         {
             // 行上でのドラッグ開始の可能性があるため、矩形選択を無効化
             return;

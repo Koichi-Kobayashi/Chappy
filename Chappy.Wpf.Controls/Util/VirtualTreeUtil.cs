@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,7 +9,7 @@ using System.Windows.Media;
 
 namespace Chappy.Wpf.Controls.Util
 {
-    public static class VisualTreeUtil
+    public static class VirtualTreeUtil
     {
         /// <summary>
         /// 指定された DependencyObject から親方向にたどって、
@@ -17,27 +18,14 @@ namespace Chappy.Wpf.Controls.Util
         /// </summary>
         public static T? FindAncestor<T>(DependencyObject? d) where T : DependencyObject
         {
-            while (d != null)
+            DependencyObject? current = d;
+
+            while (current != null)
             {
-                if (d is T t) return t;
+                if (current is T target)
+                    return target;
 
-                // FrameworkContentElement（Run/TextElement等）
-                if (d is System.Windows.FrameworkContentElement fce && fce.Parent is DependencyObject pFce)
-                {
-                    d = pFce;
-                    continue;
-                }
-
-                // Visual を優先
-                var visualParent = VisualTreeHelper.GetParent(d);
-                if (visualParent != null)
-                {
-                    d = visualParent;
-                    continue;
-                }
-
-                // Visual が取れない時だけ Logical
-                d = LogicalTreeHelper.GetParent(d);
+                current = VisualTreeHelper.GetParent(current);
             }
             return null;
         }

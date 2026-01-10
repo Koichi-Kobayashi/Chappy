@@ -144,7 +144,7 @@ public static class DataGridDragDropBehavior
         s.IsDragging = false;
         s.MouseDownPos = e.GetPosition(grid);
 
-        s.DragRow = VisualTreeUtil.FindAncestor<DataGridRow>(
+        s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
 
         // ===== Explorer 互換：複数選択中の「選択済み行」マウスダウンでは選択を単一化しない =====
@@ -202,7 +202,7 @@ public static class DataGridDragDropBehavior
         var s = GetState(grid);
         if (s.IsDragging) return;
 
-        var row = VisualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
         if (row == null) return;
 
         if (grid.SelectedItems.Count > 1 &&
@@ -451,7 +451,7 @@ public static class DataGridDragDropBehavior
     private static void UpdateHoverRow(System.Windows.Controls.DataGrid grid, DragEventArgs e)
     {
         var s = GetState(grid);
-        var row = VisualTreeUtil.FindAncestor<DataGridRow>(
+        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
 
         // 同じ行の場合は何もしない
@@ -525,7 +525,7 @@ public static class DataGridDragDropBehavior
         bool isInternalDrag = e.Data.GetDataPresent("FileSystemItem") || 
                               e.Data.GetDataPresent("FileSystemItems");
         
-        var row = VisualTreeUtil.FindAncestor<DataGridRow>(
+        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
 
         System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop called, isInternalDrag={isInternalDrag}, row={row?.Item}");
