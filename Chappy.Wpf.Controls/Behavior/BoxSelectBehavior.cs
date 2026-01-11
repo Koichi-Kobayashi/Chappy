@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -82,6 +82,9 @@ public static class BoxSelectBehavior
         var s = GetState(grid);
         s.DragStart = e.GetPosition(grid);
         s.IsDragging = false;
+
+        // 余白をクリックした場合は選択を解除
+        grid.SelectedItems.Clear();
     }
 
     private static void OnMove(object sender, MouseEventArgs e)
@@ -130,14 +133,16 @@ public static class BoxSelectBehavior
         if (sender is not System.Windows.Controls.DataGrid grid) return;
         var s = GetState(grid);
         
-        // 最終的な選択を確定
+        // ドラッグしていた場合は最終的な選択を確定
         if (s.DragStart != null && s.IsDragging)
         {
             var pos = e.GetPosition(grid);
             var selectionRect = new Rect(s.DragStart.Value, pos);
             UpdateSelection(grid, selectionRect);
         }
+        // ドラッグしていない場合（余白の単純なクリック）は選択解除はOnDownで既に処理済み
         
+        // ドラッグ状態をクリーンアップ
         ClearSelection(grid);
     }
 
