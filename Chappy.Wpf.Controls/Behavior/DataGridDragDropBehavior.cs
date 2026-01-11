@@ -55,9 +55,12 @@ public static class DataGridDragDropBehavior
         public bool IsDragging;
         public DataGridRow? DragRow;
         public DataGridRow? HoverRow;
-        public Brush? OriginalBackground;
+        // Background は IsSelected 等のスタイルトリガーで動的に変わるため、
+        // 「見えている Brush」を保存して Set で戻すとローカル値として固定化され、選択っぽい見た目が残ることがある。
+        // なのでローカル値（UnsetValue含む）を保存し、復元時は ClearValue でトリガー制御に戻す。
+        public object? HoverOriginalBackgroundLocalValue; // Control.BackgroundProperty のローカル値（UnsetValue含む）
         public List<DataGridRow>? DraggedRows; // ドラッグ中の複数選択された行
-        public Dictionary<DataGridRow, Brush?>? OriginalBackgrounds; // 各行の元の背景色
+        public Dictionary<DataGridRow, object?>? OriginalBackgroundLocalValues; // 各行の Background ローカル値（UnsetValue含む）
         public List<object>? SavedSelectedItems; // マウスダウン時の選択されたアイテムを保存
 
         // Explorer 互換の「複数選択からのドラッグ」用。
@@ -321,7 +324,7 @@ public static class DataGridDragDropBehavior
         
         // ドラッグ元の複数選択された行を取得してホバー状態にする
         s.DraggedRows = new List<DataGridRow>();
-        s.OriginalBackgrounds = new Dictionary<DataGridRow, Brush?>();
+        s.OriginalBackgroundLocalValues = new Dictionary<DataGridRow, object?>();
         
         foreach (var item in items)
         {
@@ -329,12 +332,12 @@ public static class DataGridDragDropBehavior
             if (row != null)
             {
                 s.DraggedRows.Add(row);
-                s.OriginalBackgrounds[row] = row.Background;
+                s.OriginalBackgroundLocalValues[row] = row.ReadLocalValue(Control.BackgroundProperty);
                 
                 // ホバー効果として背景色を変更（薄い青色）
                 var hoverBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x7A, 0xCC));
                 hoverBrush.Freeze();
-                row.Background = hoverBrush;
+                row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
             }
             else
             {
@@ -464,40 +467,54 @@ public static class DataGridDragDropBehavior
         if (row != null)
         {
             s.HoverRow = row;
-            s.OriginalBackground = row.Background;
+            s.HoverOriginalBackgroundLocalValue = row.ReadLocalValue(Control.BackgroundProperty);
             
             // ホバー効果として背景色を変更（薄い青色）
             var hoverBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x7A, 0xCC));
             hoverBrush.Freeze();
-            row.Background = hoverBrush;
+            row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
         }
     }
 
     private static void ClearHoverRow(System.Windows.Controls.DataGrid grid)
     {
         var s = GetState(grid);
-        if (s.HoverRow != null && s.OriginalBackground != null)
+        if (s.HoverRow != null)
         {
-            s.HoverRow.Background = s.OriginalBackground;
+            if (ReferenceEquals(s.HoverOriginalBackgroundLocalValue, DependencyProperty.UnsetValue))
+            {
+                s.HoverRow.ClearValue(Control.BackgroundProperty);
+            }
+            else
+            {
+                s.HoverRow.SetValue(Control.BackgroundProperty, s.HoverOriginalBackgroundLocalValue);
+            }
             s.HoverRow = null;
-            s.OriginalBackground = null;
+            s.HoverOriginalBackgroundLocalValue = null;
         }
     }
 
     private static void ClearDraggedRows(System.Windows.Controls.DataGrid grid)
     {
         var s = GetState(grid);
-        if (s.DraggedRows != null && s.OriginalBackgrounds != null)
+        if (s.DraggedRows != null && s.OriginalBackgroundLocalValues != null)
         {
             foreach (var row in s.DraggedRows)
             {
-                if (s.OriginalBackgrounds.TryGetValue(row, out var originalBg))
+                if (s.OriginalBackgroundLocalValues.TryGetValue(row, out var originalLocalValue))
                 {
-                    row.Background = originalBg;
+                    if (ReferenceEquals(originalLocalValue, DependencyProperty.UnsetValue))
+                    {
+                        row.ClearValue(Control.BackgroundProperty);
+                    }
+                    else
+                    {
+                        row.SetValue(Control.BackgroundProperty, originalLocalValue);
+                    }
                 }
             }
             s.DraggedRows = null;
-            s.OriginalBackgrounds = null;
+            s.OriginalBackgroundLocalValues = null;
         }
     }
 
