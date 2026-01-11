@@ -96,22 +96,25 @@ public static class BoxSelectBehavior
         // イベントが既に処理済みの場合は何もしない（DataGridDragDropBehaviorがドラッグを開始した場合）
         if (e.Handled) return;
 
-        // 行上でマウスが動いている場合は矩形選択を無効化（行上でのドラッグ開始を優先）
-        if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
-        {
-            // 行上でのドラッグ開始の可能性があるため、矩形選択を無効化
-            return;
-        }
-
         var pos = e.GetPosition(grid);
+        
+        // ドラッグ開始前のチェック：行上で開始された場合は矩形選択を無効化
         if (!s.IsDragging)
         {
+            // 行上でマウスが動いている場合は矩形選択を無効化（行上でのドラッグ開始を優先）
+            if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+            {
+                return;
+            }
+
+            // ドラッグ距離が最小距離に達していない場合は何もしない
             if (Math.Abs(pos.X - s.DragStart.Value.X) <
                 SystemParameters.MinimumHorizontalDragDistance &&
                 Math.Abs(pos.Y - s.DragStart.Value.Y) <
                 SystemParameters.MinimumVerticalDragDistance)
                 return;
 
+            // ドラッグ開始を確定
             s.IsDragging = true;
             s.Layer = AdornerLayer.GetAdornerLayer(grid);
             if (s.Layer != null)
@@ -121,6 +124,7 @@ public static class BoxSelectBehavior
             }
         }
 
+        // 既にドラッグが開始されている場合は、行上を通過しても矩形選択を継続
         var selectionRect = new Rect(s.DragStart.Value, pos);
         s.Adorner?.Update(selectionRect);
         
