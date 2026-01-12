@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -74,6 +75,11 @@ public static class BoxSelectBehavior
     private static void OnDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+
+        // スクロールバー上の操作（Thumb/Track/RepeatButton 等）では矩形選択を開始しない。
+        // また、この場合に「余白クリック扱い」で選択解除もしない。
+        if (VirtualTreeUtil.FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) != null)
+            return;
 
         // 行上なら通常処理
         if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)

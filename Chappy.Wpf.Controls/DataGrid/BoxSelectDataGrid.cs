@@ -90,6 +90,15 @@ public class BoxSelectDataGrid : System.Windows.Controls.DataGrid
         if (!IsBoxSelectionEnabled) return;
         if (e.ClickCount != 1) return;
 
+        // スクロールバー上の操作（Thumb/Track/RepeatButton 等）では矩形選択を開始しない
+        var dep = e.OriginalSource as DependencyObject;
+        if (dep != null && FindParent<ScrollBar>(dep) != null)
+        {
+            _dragStart = null;
+            _isDragging = false;
+            return;
+        }
+
         // Do NOT kill normal click selection here.
         _dragStart = e.GetPosition(this);
         _isDragging = false;
