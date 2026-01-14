@@ -25,7 +25,22 @@ namespace Chappy.Wpf.Controls.Util
                 if (current is T target)
                     return target;
 
-                current = VisualTreeHelper.GetParent(current);
+                // Visual tree (Visual / Visual3D)
+                if (current is Visual || current is System.Windows.Media.Media3D.Visual3D)
+                {
+                    current = VisualTreeHelper.GetParent(current);
+                    continue;
+                }
+
+                // FrameworkContentElement (Run など) は VisualTreeHelper.GetParent が取れないことがある
+                if (current is FrameworkContentElement fce && fce.Parent is DependencyObject fceParent)
+                {
+                    current = fceParent;
+                    continue;
+                }
+
+                // Fallback to logical tree
+                current = LogicalTreeHelper.GetParent(current);
             }
             return null;
         }

@@ -32,13 +32,20 @@ namespace Chappy.Wpf.Controls.Test
 
         public System.Func<IList, System.Windows.IDataObject?> BuildDragPayload => items =>
         {
-            var paths = items.Cast<FileEntry>()
-                             .Select(x => x.FullPath)
-                             .ToArray();
+            if (items is Chappy.Wpf.Controls.Test.FileEntry)
+            {
+                var paths = items.Cast<FileEntry>()
+                                 .Select(x => x.FullPath)
+                                 .ToArray();
 
-            var data = new DataObject();
-            data.SetData(DataFormats.FileDrop, paths);
-            return data;
+                var data = new DataObject();
+                data.SetData(DataFormats.FileDrop, paths);
+                return data;
+            }
+            else
+            {
+                return null;
+            }
         };
 
         public System.Action<System.Windows.IDataObject, object?> OnDrop => (data, target) =>
