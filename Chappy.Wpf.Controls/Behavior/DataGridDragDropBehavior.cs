@@ -53,6 +53,7 @@ public static class DataGridDragDropBehavior
     {
         public Point MouseDownPos;
         public bool IsDragging;
+        public bool StartedOnRightEmptyArea;
         public DataGridRow? DragRow;
         public DataGridRow? HoverRow;
         // Background は IsSelected 等のスタイルトリガーで動的に変わるため、
@@ -147,8 +148,17 @@ public static class DataGridDragDropBehavior
         s.IsDragging = false;
         s.MouseDownPos = e.GetPosition(grid);
 
+        // 右側余白（列の合計幅より右）からは矩形選択を優先し、D&D開始判定を無効化する
+        s.StartedOnRightEmptyArea = IsRightEmptyArea(grid, s.MouseDownPos);
+
         s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
+
+        if (s.StartedOnRightEmptyArea)
+        {
+            // 右側余白からは D&D を始めない
+            s.DragRow = null;
+        }
 
         // ===== Explorer 互換：複数選択中の「選択済み行」マウスダウンでは選択を単一化しない =====
         // Explorer は「ドラッグになるかもしれない」間は選択を変えず、
@@ -257,6 +267,7 @@ public static class DataGridDragDropBehavior
             // 通常ケース：抑止フラグは必ずクリア
             s.SuppressSelectionOnMouseDown = false;
             s.ClickedSelectedItem = null;
+            s.StartedOnRightEmptyArea = false;
         }
     }
 
@@ -266,6 +277,7 @@ public static class DataGridDragDropBehavior
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
         var s = GetState(grid);
+        if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
 
         var pos = e.GetPosition(grid);
@@ -428,6 +440,15 @@ public static class DataGridDragDropBehavior
     }
 
     #endregion
+
+    private static bool IsRightEmptyArea(System.Windows.Controls.DataGrid grid, Point pos)
+    {
+        double columnsWidth = grid.Columns
+            .Where(c => c.Visibility == Visibility.Visible)
+            .Sum(c => c.ActualWidth);
+
+        return pos.X > columnsWidth;
+    }
 
     #region Drag Events
 

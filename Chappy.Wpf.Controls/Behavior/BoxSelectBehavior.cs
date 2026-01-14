@@ -31,6 +31,7 @@ public static class BoxSelectBehavior
     {
         public Point? DragStart;
         public bool IsDragging;
+        public bool StartedOnRightEmptyArea;
         public AdornerLayer? Layer;
         public SelectionAdorner? Adorner;
     }
@@ -81,13 +82,18 @@ public static class BoxSelectBehavior
         if (VirtualTreeUtil.FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) != null)
             return;
 
-        // 行上なら通常処理
-        if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+        var pos = e.GetPosition(grid);
+        bool onRow = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null;
+        bool rightEmptyArea = IsRightEmptyArea(grid, pos);
+
+        // 行上で、かつ右側余白ではないなら通常処理（行上からのドラッグは D&D を優先）
+        if (onRow && !rightEmptyArea)
             return;
 
         var s = GetState(grid);
-        s.DragStart = e.GetPosition(grid);
+        s.DragStart = pos;
         s.IsDragging = false;
+        s.StartedOnRightEmptyArea = rightEmptyArea;
 
         // 余白をクリックした場合は選択を解除
         grid.SelectedItems.Clear();
@@ -108,7 +114,9 @@ public static class BoxSelectBehavior
         if (!s.IsDragging)
         {
             // 行上でマウスが動いている場合は矩形選択を無効化（行上でのドラッグ開始を優先）
-            if (VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
+            // ただし「右側余白」から開始した場合は矩形選択を優先する
+            if (!s.StartedOnRightEmptyArea &&
+                VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null)
             {
                 return;
             }
@@ -205,8 +213,18 @@ public static class BoxSelectBehavior
 
         s.DragStart = null;
         s.IsDragging = false;
+        s.StartedOnRightEmptyArea = false;
         s.Layer = null;
         s.Adorner = null;
+    }
+
+    private static bool IsRightEmptyArea(System.Windows.Controls.DataGrid grid, Point pos)
+    {
+        double columnsWidth = grid.Columns
+            .Where(c => c.Visibility == Visibility.Visible)
+            .Sum(c => c.ActualWidth);
+
+        return pos.X > columnsWidth;
     }
 
     private sealed class SelectionAdorner : Adorner
