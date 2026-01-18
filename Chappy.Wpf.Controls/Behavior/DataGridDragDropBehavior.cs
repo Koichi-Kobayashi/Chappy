@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Chappy.Wpf.Controls.Util;
 using System;
 using System.Collections;
@@ -148,11 +148,16 @@ public static class DataGridDragDropBehavior
         s.IsDragging = false;
         s.MouseDownPos = e.GetPosition(grid);
 
-        // 右側余白（列の合計幅より右）からは矩形選択を優先し、D&D開始判定を無効化する
-        s.StartedOnRightEmptyArea = IsRightEmptyArea(grid, s.MouseDownPos);
-
         s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
+
+        bool firstColumnOnly = BoxSelectBehavior.GetIsRowSelectionFirstColumnOnly(grid);
+        bool nonPrimaryColumnArea = firstColumnOnly &&
+            s.DragRow != null &&
+            !BoxSelectBehavior.IsRowSelectionPrimaryArea(grid, e.OriginalSource as DependencyObject);
+
+        // 右側余白（列の合計幅より右）または先頭列以外からは矩形選択を優先し、D&D開始判定を無効化する
+        s.StartedOnRightEmptyArea = IsRightEmptyArea(grid, s.MouseDownPos) || nonPrimaryColumnArea;
 
         if (s.StartedOnRightEmptyArea)
         {

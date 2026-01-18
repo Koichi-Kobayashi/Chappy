@@ -21,11 +21,24 @@ public static class BoxSelectBehavior
             typeof(BoxSelectBehavior),
             new PropertyMetadata(false, OnChanged));
 
+    public static readonly DependencyProperty IsRowSelectionFirstColumnOnlyProperty =
+        DependencyProperty.RegisterAttached(
+            "IsRowSelectionFirstColumnOnly",
+            typeof(bool),
+            typeof(BoxSelectBehavior),
+            new PropertyMetadata(false));
+
     public static void SetIsEnabled(DependencyObject d, bool v)
         => d.SetValue(IsEnabledProperty, v);
 
     public static bool GetIsEnabled(DependencyObject d)
         => (bool)d.GetValue(IsEnabledProperty);
+
+    public static void SetIsRowSelectionFirstColumnOnly(DependencyObject d, bool v)
+        => d.SetValue(IsRowSelectionFirstColumnOnlyProperty, v);
+
+    public static bool GetIsRowSelectionFirstColumnOnly(DependencyObject d)
+        => (bool)d.GetValue(IsRowSelectionFirstColumnOnlyProperty);
 
     private sealed class State
     {
@@ -85,18 +98,25 @@ public static class BoxSelectBehavior
         var pos = e.GetPosition(grid);
         bool onRow = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null;
         bool rightEmptyArea = IsRightEmptyArea(grid, pos);
+        bool firstColumnOnly = GetIsRowSelectionFirstColumnOnly(grid);
+        bool primarySelectArea = !firstColumnOnly || IsRowSelectionPrimaryArea(grid, e.OriginalSource as DependencyObject);
+        bool treatAsEmptyArea = rightEmptyArea || (firstColumnOnly && onRow && !primarySelectArea);
 
         // 行上で、かつ右側余白ではないなら通常処理（行上からのドラッグは D&D を優先）
-        if (onRow && !rightEmptyArea)
+        if (onRow && !treatAsEmptyArea)
             return;
 
         var s = GetState(grid);
         s.DragStart = pos;
         s.IsDragging = false;
-        s.StartedOnRightEmptyArea = rightEmptyArea;
+        s.StartedOnRightEmptyArea = treatAsEmptyArea;
 
         // 余白をクリックした場合は選択を解除
         grid.SelectedItems.Clear();
+
+        // 先頭列以外を余白扱いにする場合は既定のセル選択を抑止
+        if (firstColumnOnly && onRow && !primarySelectArea)
+            e.Handled = true;
     }
 
     private static void OnMove(object sender, MouseEventArgs e)
@@ -225,6 +245,26 @@ public static class BoxSelectBehavior
             .Sum(c => c.ActualWidth);
 
         return pos.X > columnsWidth;
+    }
+
+    internal static bool IsRowSelectionPrimaryArea(System.Windows.Controls.DataGrid grid, DependencyObject? source)
+    {
+        if (VirtualTreeUtil.FindAncestor<DataGridRowHeader>(source) != null)
+            return true;
+
+        var cell = VirtualTreeUtil.FindAncestor<DataGridCell>(source);
+        if (cell == null) return false;
+
+        var firstColumn = GetFirstVisibleColumn(grid);
+        return firstColumn != null && ReferenceEquals(cell.Column, firstColumn);
+    }
+
+    private static DataGridColumn? GetFirstVisibleColumn(System.Windows.Controls.DataGrid grid)
+    {
+        return grid.Columns
+            .Where(c => c.Visibility == Visibility.Visible)
+            .OrderBy(c => c.DisplayIndex)
+            .FirstOrDefault();
     }
 
     private sealed class SelectionAdorner : Adorner

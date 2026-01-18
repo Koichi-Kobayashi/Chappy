@@ -31,6 +31,7 @@
         <DataGrid
             Grid.Column="1"
             behaviors:BoxSelectBehavior.IsEnabled="True"
+            behaviors:BoxSelectBehavior.IsRowSelectionFirstColumnOnly="True"
             behaviors:DataGridDragDropBehavior.BuildPayload="{Binding BuildDragPayload}"
             behaviors:DataGridDragDropBehavior.DropHandler="{Binding OnDrop}"
             behaviors:DataGridDragDropBehavior.IsEnabled="True"
