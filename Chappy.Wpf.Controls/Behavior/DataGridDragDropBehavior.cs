@@ -4,6 +4,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -53,6 +54,9 @@ public static class DataGridDragDropBehavior
     {
         public Point MouseDownPos;
         public bool IsDragging;
+        public bool CancelDragRequested;
+        public bool SuppressDragUntilLeftUp;
+        public long DragStartTimestamp;
         public bool StartedOnRightEmptyArea;
         public DataGridRow? DragRow;
         public DataGridRow? HoverRow;
@@ -79,6 +83,10 @@ public static class DataGridDragDropBehavior
             typeof(DataGridDragDropBehavior),
             new PropertyMetadata(null));
 
+    private static int s_inputHookRefCount;
+    private static long s_lastRightButtonDownTimestamp;
+    private static readonly PreProcessInputEventHandler s_preProcessInputHandler = OnPreProcessInput;
+
     private static State GetState(System.Windows.Controls.DataGrid g)
     {
         var s = (State?)g.GetValue(StateProperty);
@@ -100,10 +108,13 @@ public static class DataGridDragDropBehavior
 
         if ((bool)e.NewValue)
         {
+            if (s_inputHookRefCount++ == 0)
+                InputManager.Current.PreProcessInput += s_preProcessInputHandler;
             grid.PreviewMouseLeftButtonDown += OnMouseDown;
             grid.PreviewMouseLeftButtonUp += OnMouseUp;
             grid.PreviewMouseRightButtonDown += OnRightMouseDown;
             grid.PreviewMouseMove += OnMouseMove;
+            grid.QueryContinueDrag += OnQueryContinueDrag;
             grid.DragEnter += OnDragEnter;
             grid.DragOver += OnDragOver;
             grid.DragLeave += OnDragLeave;
@@ -116,10 +127,13 @@ public static class DataGridDragDropBehavior
             grid.PreviewMouseLeftButtonUp -= OnMouseUp;
             grid.PreviewMouseRightButtonDown -= OnRightMouseDown;
             grid.PreviewMouseMove -= OnMouseMove;
+            grid.QueryContinueDrag -= OnQueryContinueDrag;
             grid.DragEnter -= OnDragEnter;
             grid.DragOver -= OnDragOver;
             grid.DragLeave -= OnDragLeave;
             grid.Drop -= OnDrop;
+            if (--s_inputHookRefCount == 0)
+                InputManager.Current.PreProcessInput -= s_preProcessInputHandler;
         }
     }
 
@@ -218,7 +232,15 @@ public static class DataGridDragDropBehavior
         if (sender is not System.Windows.Controls.DataGrid grid) return;
 
         var s = GetState(grid);
-        if (s.IsDragging) return;
+        if (s.IsDragging)
+        {
+            // 右クリックを押した瞬間にドラッグをキャンセルする
+            s.CancelDragRequested = true;
+            // 右クリックを離すまで再ドラッグを抑止
+            s.SuppressDragUntilLeftUp = true;
+            e.Handled = true;
+            return;
+        }
 
         var row = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
         if (row == null) return;
@@ -273,6 +295,8 @@ public static class DataGridDragDropBehavior
             s.SuppressSelectionOnMouseDown = false;
             s.ClickedSelectedItem = null;
             s.StartedOnRightEmptyArea = false;
+            if (e.ChangedButton == MouseButton.Left)
+                s.SuppressDragUntilLeftUp = false;
         }
     }
 
@@ -282,6 +306,7 @@ public static class DataGridDragDropBehavior
         if (e.LeftButton != MouseButtonState.Pressed) return;
 
         var s = GetState(grid);
+        if (s.SuppressDragUntilLeftUp) return;
         if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
 
@@ -319,6 +344,7 @@ public static class DataGridDragDropBehavior
         
         // ドラッグ開始フラグを設定
         s.IsDragging = true;
+        s.DragStartTimestamp = Stopwatch.GetTimestamp();
 
         // MouseDown で抑止していた「クリック確定時の単一化」は、ドラッグになったので無効化
         s.SuppressSelectionOnMouseDown = false;
@@ -441,6 +467,67 @@ public static class DataGridDragDropBehavior
             s.IsDragging = false;
             // 保存された選択をクリア
             s.SavedSelectedItems = null;
+        }
+    }
+
+    private static void OnQueryContinueDrag(object sender, QueryContinueDragEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.DataGrid grid) return;
+        var s = GetState(grid);
+        if (!s.IsDragging) return;
+
+        if (e.EscapePressed)
+        {
+            s.SuppressDragUntilLeftUp = true;
+            if (Mouse.Captured != null)
+                Mouse.Capture(null);
+            e.Action = DragAction.Cancel;
+            e.Handled = true;
+            return;
+        }
+
+        if (s_lastRightButtonDownTimestamp >= s.DragStartTimestamp)
+        {
+            s_lastRightButtonDownTimestamp = 0;
+            s.SuppressDragUntilLeftUp = true;
+            if (Mouse.Captured != null)
+                Mouse.Capture(null);
+            e.Action = DragAction.Cancel;
+            e.Handled = true;
+            return;
+        }
+
+        if (s.CancelDragRequested)
+        {
+            s.CancelDragRequested = false;
+            s.SuppressDragUntilLeftUp = true;
+            // 左ボタンのドラッグ状態も終わらせるため、キャプチャを解放
+            if (Mouse.Captured != null)
+                Mouse.Capture(null);
+            e.Action = DragAction.Cancel;
+            e.Handled = true;
+            return;
+        }
+
+        // 右クリック中はドラッグをキャンセルする
+        if (e.KeyStates.HasFlag(DragDropKeyStates.RightMouseButton) ||
+            Mouse.RightButton == MouseButtonState.Pressed)
+        {
+            s.SuppressDragUntilLeftUp = true;
+            if (Mouse.Captured != null)
+                Mouse.Capture(null);
+            e.Action = DragAction.Cancel;
+            e.Handled = true;
+        }
+    }
+
+    private static void OnPreProcessInput(object sender, PreProcessInputEventArgs e)
+    {
+        if (e.StagingItem.Input is MouseButtonEventArgs mbe &&
+            mbe.ChangedButton == MouseButton.Right &&
+            mbe.ButtonState == MouseButtonState.Pressed)
+        {
+            s_lastRightButtonDownTimestamp = Stopwatch.GetTimestamp();
         }
     }
 
