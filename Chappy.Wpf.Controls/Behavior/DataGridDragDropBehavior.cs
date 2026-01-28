@@ -60,6 +60,8 @@ public static class DataGridDragDropBehavior
         public bool StartedOnRightEmptyArea;
         public DataGridRow? DragRow;
         public DataGridRow? HoverRow;
+        public DataGridRow? HoverCandidateRow;
+        public long HoverCandidateTimestamp;
         // Background は IsSelected 等のスタイルトリガーで動的に変わるため、
         // 「見えている Brush」を保存して Set で戻すとローカル値として固定化され、選択っぽい見た目が残ることがある。
         // なのでローカル値（UnsetValue含む）を保存し、復元時は ClearValue でトリガー制御に戻す。
@@ -562,19 +564,52 @@ public static class DataGridDragDropBehavior
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
         ClearHoverRow(grid);
+        ClearHoverCandidate(grid);
+    }
+
+    private static DataGridRow? GetRowFromPoint(System.Windows.Controls.DataGrid grid, Point position)
+    {
+        if (IsRightEmptyArea(grid, position)) return null;
+
+        var hit = grid.InputHitTest(position) as DependencyObject;
+        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(hit);
+        if (row == null) return null;
+
+        var origin = row.TranslatePoint(new Point(0, 0), grid);
+        var rect = new Rect(origin, row.RenderSize);
+        return rect.Contains(position) ? row : null;
     }
 
     private static void UpdateHoverRow(System.Windows.Controls.DataGrid grid, DragEventArgs e)
     {
         var s = GetState(grid);
-        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(
-            e.OriginalSource as DependencyObject);
+        var pos = e.GetPosition(grid);
+        var row = GetRowFromPoint(grid, pos);
+
+        if (row == null)
+        {
+            ClearHoverRow(grid);
+            ClearHoverCandidate(grid);
+            return;
+        }
 
         // 同じ行の場合は何もしない
         if (s.HoverRow == row) return;
 
+        if (s.HoverCandidateRow != row)
+        {
+            s.HoverCandidateRow = row;
+            s.HoverCandidateTimestamp = Stopwatch.GetTimestamp();
+            return;
+        }
+
+        const int hoverActivationMs = 120;
+        var elapsedMs = (Stopwatch.GetTimestamp() - s.HoverCandidateTimestamp) * 1000.0 / Stopwatch.Frequency;
+        if (elapsedMs < hoverActivationMs) return;
+
         // 前の行のホバー効果をクリア
         ClearHoverRow(grid);
+        ClearHoverCandidate(grid);
 
         // 新しい行にホバー効果を適用
         if (row != null)
@@ -605,6 +640,13 @@ public static class DataGridDragDropBehavior
             s.HoverRow = null;
             s.HoverOriginalBackgroundLocalValue = null;
         }
+    }
+
+    private static void ClearHoverCandidate(System.Windows.Controls.DataGrid grid)
+    {
+        var s = GetState(grid);
+        s.HoverCandidateRow = null;
+        s.HoverCandidateTimestamp = 0;
     }
 
     private static void ClearDraggedRows(System.Windows.Controls.DataGrid grid)
@@ -655,8 +697,11 @@ public static class DataGridDragDropBehavior
         bool isInternalDrag = e.Data.GetDataPresent("FileSystemItem") || 
                               e.Data.GetDataPresent("FileSystemItems");
         
-        var row = VirtualTreeUtil.FindAncestor<DataGridRow>(
-            e.OriginalSource as DependencyObject);
+        var pos = e.GetPosition(grid);
+        var row = GetRowFromPoint(grid, pos);
+        var s = GetState(grid);
+        if (row == null)
+            row = s.HoverRow;
 
         System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop called, isInternalDrag={isInternalDrag}, row={row?.Item}");
         handler(e.Data, row?.Item);
