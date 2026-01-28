@@ -57,6 +57,10 @@ public class BoxSelectDataGrid : System.Windows.Controls.DataGrid
 
     public BoxSelectDataGrid()
     {
+        // Explorer-style selection by default (Ctrl/Shift multi-select)
+        SelectionMode = DataGridSelectionMode.Extended;
+        SelectionUnit = DataGridSelectionUnit.FullRow;
+
         // 60fps-ish throttle. Keeps UI smooth even if MouseMove is 200Hz.
         _selectionTimer = new DispatcherTimer(DispatcherPriority.Input)
         {
