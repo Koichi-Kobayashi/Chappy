@@ -53,6 +53,7 @@ public static class DataGridDragDropBehavior
     private sealed class State
     {
         public Point MouseDownPos;
+        public long MouseDownTimestamp;
         public bool IsDragging;
         public bool CancelDragRequested;
         public bool SuppressDragUntilLeftUp;
@@ -163,6 +164,7 @@ public static class DataGridDragDropBehavior
         
         s.IsDragging = false;
         s.MouseDownPos = e.GetPosition(grid);
+        s.MouseDownTimestamp = Stopwatch.GetTimestamp();
 
         s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
@@ -311,6 +313,10 @@ public static class DataGridDragDropBehavior
         if (s.SuppressDragUntilLeftUp) return;
         if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
+
+        const int dragStartDelayMs = 1300;  // 1.3秒間ドラッグ開始を遅延させる（誤ドラッグ防止）
+        var elapsedSinceMouseDownMs = (Stopwatch.GetTimestamp() - s.MouseDownTimestamp) * 1000.0 / Stopwatch.Frequency;
+        if (elapsedSinceMouseDownMs < dragStartDelayMs) return;
 
         var pos = e.GetPosition(grid);
         if (Math.Abs(pos.X - s.MouseDownPos.X) < SystemParameters.MinimumHorizontalDragDistance &&
