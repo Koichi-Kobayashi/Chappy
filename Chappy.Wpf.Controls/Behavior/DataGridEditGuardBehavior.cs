@@ -524,7 +524,13 @@ public static class DataGridEditGuardBehavior
         if (col == null) return;
 
         grid.CurrentCell = new DataGridCellInfo(grid.SelectedItem, col);
-        grid.Focus();
+
+        // 既にDataGrid内にフォーカスがある場合は、フォーカス移動を抑止
+        var focused = Keyboard.FocusedElement as DependencyObject;
+        if (focused == null || !IsDescendantOf(focused, grid))
+        {
+            grid.Focus();
+        }
 
         if (grid.BeginEdit())
             GetState(grid).IsRenaming = true;
