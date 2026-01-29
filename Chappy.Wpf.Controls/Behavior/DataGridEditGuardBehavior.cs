@@ -615,11 +615,7 @@ public static class DataGridEditGuardBehavior
 
         if (e.EditingElement is TextBox tb)
         {
-            tb.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                tb.Focus();
-                SelectNameWithoutExtension(tb);
-            }), DispatcherPriority.Input);
+            FocusAndSelectNameWithoutExtension(tb);
             return;
         }
 
@@ -630,11 +626,7 @@ public static class DataGridEditGuardBehavior
             var textBox = VirtualTreeUtil.FindDescendant<TextBox>(cp);
             if (textBox != null)
             {
-                textBox.Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    textBox.Focus();
-                    SelectNameWithoutExtension(textBox);
-                }), DispatcherPriority.Input);
+                FocusAndSelectNameWithoutExtension(textBox);
             }
         }
     }
@@ -665,29 +657,121 @@ public static class DataGridEditGuardBehavior
     private static void SelectNameWithoutExtension(TextBox tb)
     {
         // バインディングが反映される前の瞬間があるので、フォーカス後に走らせるのが安全
-        var text = tb.Text ?? string.Empty;
+        ApplyNameSelection(tb);
+    }
 
+    private static void FocusAndSelectNameWithoutExtension(TextBox tb)
+    {
+        // クリック起因の編集開始で選択が潰れることがあるため、短時間だけ選択を固定する
+        AttachInitialSelectionGuard(tb, TimeSpan.FromMilliseconds(200));
+        tb.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            tb.Focus();
+            SelectNameWithoutExtension(tb);
+
+            tb.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                SelectNameWithoutExtension(tb);
+            }), DispatcherPriority.ContextIdle);
+        }), DispatcherPriority.Input);
+    }
+
+    private static void AttachInitialSelectionGuard(TextBox tb, TimeSpan duration)
+    {
+        bool active = true;
+        bool applying = false;
+
+        var timer = new DispatcherTimer(DispatcherPriority.Input)
+        {
+            Interval = duration
+        };
+
+        void Detach()
+        {
+            if (!active) return;
+            active = false;
+            tb.SelectionChanged -= SelectionChangedHandler;
+            tb.PreviewKeyDown -= KeyDownHandler;
+            tb.LostFocus -= LostFocusHandler;
+            timer.Stop();
+        }
+
+        void SelectionChangedHandler(object? sender, RoutedEventArgs e)
+        {
+            if (!active || applying) return;
+
+            if (!IsNameSelectionApplied(tb))
+            {
+                applying = true;
+                ApplyNameSelection(tb);
+                applying = false;
+            }
+        }
+
+        void KeyDownHandler(object? sender, KeyEventArgs e)
+        {
+            Detach();
+        }
+
+        void LostFocusHandler(object? sender, RoutedEventArgs e)
+        {
+            Detach();
+        }
+
+        timer.Tick += (s, e) => Detach();
+
+        tb.SelectionChanged += SelectionChangedHandler;
+        tb.PreviewKeyDown += KeyDownHandler;
+        tb.LostFocus += LostFocusHandler;
+        timer.Start();
+    }
+
+    private static bool IsNameSelectionApplied(TextBox tb)
+    {
+        if (!TryGetNameSelection(tb.Text ?? string.Empty, out var start, out var length, out _))
+            return false;
+
+        return tb.SelectionStart == start && tb.SelectionLength == length;
+    }
+
+    private static void ApplyNameSelection(TextBox tb)
+    {
+        if (!TryGetNameSelection(tb.Text ?? string.Empty, out var start, out var length, out _))
+            return;
+
+        // CaretIndex を後から設定すると選択が解除されることがあるため、
+        // 選択範囲のみを明示的に設定する
+        tb.SelectionStart = start;
+        tb.SelectionLength = length;
+    }
+
+    private static bool TryGetNameSelection(string text, out int start, out int length, out int caret)
+    {
         // フォルダー（拡張子無し）や「.gitignore」みたいなドット始まりは全選択に寄せる
         // ※ Explorer はドット始まりファイルは全部選択寄りの挙動です
         if (text.Length == 0 || text[0] == '.')
         {
-            tb.SelectAll();
-            tb.CaretIndex = tb.Text?.Length ?? 0;
-            return;
+            start = 0;
+            length = text.Length;
+            caret = text.Length;
+            return true;
         }
 
         var lastDot = text.LastIndexOf('.');
         if (lastDot <= 0 || lastDot >= text.Length - 1)
         {
             // ドット無し / 末尾ドット → 全選択
-            tb.SelectAll();
-            tb.CaretIndex = tb.Text?.Length ?? 0;
-            return;
+            start = 0;
+            length = text.Length;
+            caret = text.Length;
+            return true;
         }
 
         // "name.ext" の "name" 部分だけ
-        tb.Select(0, lastDot);
-        tb.CaretIndex = lastDot;
+        start = 0;
+        length = lastDot;
+        caret = lastDot;
+        return true;
     }
 
     #endregion
