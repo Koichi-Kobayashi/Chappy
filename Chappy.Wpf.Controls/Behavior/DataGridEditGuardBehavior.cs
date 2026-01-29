@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Chappy.Wpf.Controls.Util;
 using System;
 using System.Windows;
@@ -47,6 +47,7 @@ public static class DataGridEditGuardBehavior
         public bool SuppressCommitOnce;     // 次のフォーカス喪失時の CommitEdit を抑制
         public bool SuppressMouseEditOnce;  // マウスの編集開始を 1 回だけ抑止するフラグ
         public bool SuppressRenameOnce;     // 次の MouseUp で予約しない
+        public int? SelectionAnchor;       // Shift選択のアンカー位置
     }
 
     private static readonly DependencyProperty StateProperty =
@@ -127,6 +128,12 @@ public static class DataGridEditGuardBehavior
         var src = e.OriginalSource as DependencyObject;
         var tb = src as TextBox ?? VirtualTreeUtil.FindAncestor<TextBox>(src)
                  ?? FindCurrentEditingTextBox(grid);
+        bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
+        if (!shift && e.Key != Key.Left && e.Key != Key.Right && e.Key != Key.Home && e.Key != Key.End)
+        {
+            s.SelectionAnchor = null;
+        }
 
         if (e.Key == Key.Enter)
         {
@@ -166,10 +173,15 @@ public static class DataGridEditGuardBehavior
         {
             e.Handled = true;
 
-            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
 
-            int target = tb.CaretIndex;
+            int caretBase = tb.CaretIndex;
+            if (shift)
+            {
+                caretBase = GetSelectionEdgeForMove(tb, s, e.Key);
+            }
+
+            int target = caretBase;
 
             if (e.Key == Key.Home)
             {
@@ -182,17 +194,17 @@ public static class DataGridEditGuardBehavior
             else if (e.Key == Key.Left)
             {
                 target = ctrl
-                    ? FindPrevWordBoundary(tb.Text ?? "", tb.CaretIndex)
-                    : Math.Max(0, tb.CaretIndex - 1);
+                    ? FindPrevWordBoundary(tb.Text ?? "", caretBase)
+                    : Math.Max(0, caretBase - 1);
             }
             else if (e.Key == Key.Right)
             {
                 target = ctrl
-                    ? FindNextWordBoundary(tb.Text ?? "", tb.CaretIndex)
-                    : Math.Min((tb.Text?.Length ?? 0), tb.CaretIndex + 1);
+                    ? FindNextWordBoundary(tb.Text ?? "", caretBase)
+                    : Math.Min((tb.Text?.Length ?? 0), caretBase + 1);
             }
 
-            MoveCaret(tb, target, extendSelection: shift, direction: e.Key);
+            MoveCaret(tb, s, target, extendSelection: shift, direction: e.Key);
             return;
         }
     }
@@ -270,13 +282,14 @@ public static class DataGridEditGuardBehavior
     /// Shiftなし：選択があれば「左右キーの方向に合わせて」選択を畳む（Explorerっぽい挙動）
     /// Shiftあり：選択範囲を伸縮
     /// </summary>
-    private static void MoveCaret(TextBox tb, int target, bool extendSelection, Key direction)
+    private static void MoveCaret(TextBox tb, State s, int target, bool extendSelection, Key direction)
     {
         int len = tb.Text?.Length ?? 0;
         target = Math.Max(0, Math.Min(len, target));
 
         if (!extendSelection)
         {
+            s.SelectionAnchor = null;
             // 選択があれば畳む（←は先頭、→は末尾へ）
             if (tb.SelectionLength > 0)
             {
@@ -295,17 +308,24 @@ public static class DataGridEditGuardBehavior
         }
 
         // Shiftあり：範囲選択を伸ばす
-        int caret = tb.CaretIndex;
-
-        // “アンカー”を推定
-        // 選択中で caret が SelectionStart にいるなら、反対側がアンカー
-        int anchor = caret;
-        if (tb.SelectionLength > 0)
+        int anchor;
+        if (s.SelectionAnchor.HasValue)
         {
-            anchor = (caret == tb.SelectionStart)
-                ? tb.SelectionStart + tb.SelectionLength
-                : tb.SelectionStart;
+            anchor = s.SelectionAnchor.Value;
         }
+        else if (tb.SelectionLength > 0)
+        {
+            // 方向に合わせて固定端を決める
+            anchor = (direction == Key.Right || direction == Key.End)
+                ? tb.SelectionStart
+                : tb.SelectionStart + tb.SelectionLength;
+        }
+        else
+        {
+            anchor = tb.CaretIndex;
+        }
+
+        s.SelectionAnchor = anchor;
 
         // 先に caret を target に動かしてから selection を作り直す
         tb.CaretIndex = target;
@@ -315,6 +335,23 @@ public static class DataGridEditGuardBehavior
 
         tb.SelectionStart = start;
         tb.SelectionLength = end - start;
+    }
+
+    private static int GetSelectionEdgeForMove(TextBox tb, State s, Key direction)
+    {
+        if (tb.SelectionLength <= 0)
+        {
+            return tb.CaretIndex;
+        }
+
+        int anchor = s.SelectionAnchor ?? ((direction == Key.Right || direction == Key.End)
+            ? tb.SelectionStart
+            : tb.SelectionStart + tb.SelectionLength);
+
+        // 現在の「動いている端」を返す
+        return (anchor == tb.SelectionStart)
+            ? tb.SelectionStart + tb.SelectionLength
+            : tb.SelectionStart;
     }
 
     #endregion
@@ -569,6 +606,13 @@ public static class DataGridEditGuardBehavior
 
     private static void OnPreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
+        if (sender is System.Windows.Controls.DataGrid grid)
+        {
+            var s = GetState(grid);
+            s.IsRenaming = true;
+            s.SelectionAnchor = null;
+        }
+
         if (e.EditingElement is TextBox tb)
         {
             tb.Dispatcher.BeginInvoke(new Action(() =>
@@ -628,6 +672,7 @@ public static class DataGridEditGuardBehavior
         if (text.Length == 0 || text[0] == '.')
         {
             tb.SelectAll();
+            tb.CaretIndex = tb.Text?.Length ?? 0;
             return;
         }
 
@@ -636,11 +681,13 @@ public static class DataGridEditGuardBehavior
         {
             // ドット無し / 末尾ドット → 全選択
             tb.SelectAll();
+            tb.CaretIndex = tb.Text?.Length ?? 0;
             return;
         }
 
         // "name.ext" の "name" 部分だけ
         tb.Select(0, lastDot);
+        tb.CaretIndex = lastDot;
     }
 
     #endregion
