@@ -1,7 +1,9 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -15,6 +17,15 @@ namespace Chappy.Wpf.Controls.Behaviors;
 /// </summary>
 public static class TypeAheadSearchBehavior
 {
+    #region キャッシュ
+
+    /// <summary>
+    /// プロパティ情報のキャッシュ（リフレクションのコストを削減）
+    /// </summary>
+    private static readonly ConcurrentDictionary<(Type, string), PropertyInfo?> s_propertyCache = new();
+
+    #endregion
+
     #region 添付プロパティ
 
     /// <summary>
@@ -144,13 +155,12 @@ public static class TypeAheadSearchBehavior
     /// <returns>DataGridに関連付けられた検索状態</returns>
     private static State GetState(System.Windows.Controls.DataGrid grid)
     {
-        var state = (State?)grid.GetValue(StateProperty);
-        if (state == null)
-        {
-            state = new State();
-            grid.SetValue(StateProperty, state);
-        }
-        return state;
+        if (grid.GetValue(StateProperty) is State existingState)
+            return existingState;
+
+        var newState = new State();
+        grid.SetValue(StateProperty, newState);
+        return newState;
     }
 
     #endregion
@@ -227,10 +237,10 @@ public static class TypeAheadSearchBehavior
         }
 
         // 同じ文字の繰り返しかどうかをチェック
+        var inputChar = e.Text[0];
         bool isSameCharRepeat = state.SearchText.Length > 0 &&
                                 e.Text.Length == 1 &&
-                                state.SearchText.All(c => c == e.Text[0]) &&
-                                state.SearchText[0] == e.Text[0];
+                                IsSingleCharRepeated(state.SearchText, inputChar);
 
         if (isSameCharRepeat)
         {
@@ -325,15 +335,14 @@ public static class TypeAheadSearchBehavior
         var searchText = state.SearchText;
 
         // 同じ文字の繰り返しの場合、最初の1文字で検索
-        if (searchText.Length > 1 && searchText.All(c => c == searchText[0]))
+        if (searchText.Length > 1 && IsSingleCharRepeated(searchText, searchText[0]))
         {
             searchText = searchText[0].ToString();
         }
 
-        // アイテムを検索
-        var items = grid.Items.Cast<object>().ToList();
-        var matchingItems = items
-            .Select((item, index) => new { Item = item, Index = index })
+        // アイテムを検索（ToListを1回に削減）
+        var matchingItems = grid.Items.Cast<object>()
+            .Select((item, index) => (Item: item, Index: index))
             .Where(x => MatchesSearch(x.Item, propertyName, searchText))
             .ToList();
 
@@ -341,20 +350,19 @@ public static class TypeAheadSearchBehavior
 
         // 現在のインデックスに応じてマッチを選択
         var matchIndex = state.CurrentMatchIndex % matchingItems.Count;
-        var targetItem = matchingItems[matchIndex];
+        var (item, index) = matchingItems[matchIndex];
 
         // アイテムを選択してスクロール
-        grid.SelectedItem = targetItem.Item;
-        grid.ScrollIntoView(targetItem.Item);
+        grid.SelectedItem = item;
+        grid.ScrollIntoView(item);
 
         // フォーカスも移動
-        var row = grid.ItemContainerGenerator.ContainerFromItem(targetItem.Item) as System.Windows.Controls.DataGridRow;
-        if (row != null)
+        if (grid.ItemContainerGenerator.ContainerFromItem(item) is System.Windows.Controls.DataGridRow row)
         {
             row.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
         }
 
-        Debug.WriteLine($"TypeAheadSearch: Found '{searchText}' at index {targetItem.Index} (match {matchIndex + 1}/{matchingItems.Count})");
+        Debug.WriteLine($"TypeAheadSearch: Found '{searchText}' at index {index} (match {matchIndex + 1}/{matchingItems.Count})");
     }
 
     /// <summary>
@@ -369,13 +377,30 @@ public static class TypeAheadSearchBehavior
     {
         if (item == null) return false;
 
-        var property = item.GetType().GetProperty(propertyName);
+        // プロパティ情報をキャッシュから取得（リフレクションコストを削減）
+        var itemType = item.GetType();
+        var property = s_propertyCache.GetOrAdd((itemType, propertyName), key => key.Item1.GetProperty(key.Item2));
         if (property == null) return false;
 
         var value = property.GetValue(item)?.ToString();
         if (value == null || value.Length == 0) return false;
 
         return value.StartsWith(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 文字列が単一の文字の繰り返しかどうかを判定します。
+    /// </summary>
+    /// <param name="text">判定する文字列</param>
+    /// <param name="expectedChar">期待される文字</param>
+    /// <returns>すべての文字がexpectedCharと一致する場合はtrue</returns>
+    private static bool IsSingleCharRepeated(string text, char expectedChar)
+    {
+        foreach (var c in text)
+        {
+            if (c != expectedChar) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -387,21 +412,19 @@ public static class TypeAheadSearchBehavior
     /// <param name="timeoutMs">タイムアウト時間（ミリ秒）</param>
     private static void ResetTimer(System.Windows.Controls.DataGrid grid, State state, int timeoutMs)
     {
+        var interval = TimeSpan.FromMilliseconds(timeoutMs);
+        
         if (state.ResetTimer == null)
         {
-            state.ResetTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(timeoutMs)
-            };
-            state.ResetTimer.Tick += (s, e) =>
-            {
-                ClearSearch(state);
-            };
+            state.ResetTimer = new DispatcherTimer { Interval = interval };
+            state.ResetTimer.Tick += (s, e) => ClearSearch(state);
         }
         else
         {
             state.ResetTimer.Stop();
-            state.ResetTimer.Interval = TimeSpan.FromMilliseconds(timeoutMs);
+            // Intervalが変更された場合のみ更新
+            if (state.ResetTimer.Interval != interval)
+                state.ResetTimer.Interval = interval;
         }
         state.ResetTimer.Start();
     }
