@@ -265,7 +265,7 @@ public static class BoxSelectBehavior
         return firstColumn != null && ReferenceEquals(cell.Column, firstColumn);
     }
 
-    private static DataGridColumn? GetFirstVisibleColumn(System.Windows.Controls.DataGrid grid)
+    public static DataGridColumn? GetFirstVisibleColumn(System.Windows.Controls.DataGrid grid)
     {
         return grid.Columns
             .Where(c => c.Visibility == Visibility.Visible)
