@@ -247,7 +247,13 @@ public static class BoxSelectBehavior
         return pos.X > columnsWidth;
     }
 
-    internal static bool IsRowSelectionPrimaryArea(System.Windows.Controls.DataGrid grid, DependencyObject? source)
+    /// <summary>
+    /// 指定されたソースが行選択の主要領域（1列目またはRowHeader）かどうかを判定します。
+    /// </summary>
+    /// <param name="grid">DataGrid</param>
+    /// <param name="source">判定対象のDependencyObject</param>
+    /// <returns>1列目またはRowHeaderの場合はtrue</returns>
+    public static bool IsRowSelectionPrimaryArea(System.Windows.Controls.DataGrid grid, DependencyObject? source)
     {
         if (VirtualTreeUtil.FindAncestor<DataGridRowHeader>(source) != null)
             return true;
