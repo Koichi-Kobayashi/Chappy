@@ -330,7 +330,7 @@ public static class DataGridDragDropBehavior
         if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
 
-        const int dragStartDelayMs = 1300;  // 1.3秒間ドラッグ開始を遅延させる（誤ドラッグ防止）
+        const int dragStartDelayMs = 500;  // 0.5秒間ドラッグ開始を遅延させる（誤ドラッグ防止）
         var elapsedSinceMouseDownMs = (Stopwatch.GetTimestamp() - s.MouseDownTimestamp) * 1000.0 / Stopwatch.Frequency;
         if (elapsedSinceMouseDownMs < dragStartDelayMs) return;
 
