@@ -262,7 +262,10 @@ public static class BoxSelectBehavior
         if (cell == null) return false;
 
         var firstColumn = GetFirstVisibleColumn(grid);
-        return firstColumn != null && ReferenceEquals(cell.Column, firstColumn);
+        if (firstColumn == null) return false;
+        
+        // DisplayIndexで比較（より確実）
+        return cell.Column.DisplayIndex == firstColumn.DisplayIndex;
     }
 
     public static DataGridColumn? GetFirstVisibleColumn(System.Windows.Controls.DataGrid grid)

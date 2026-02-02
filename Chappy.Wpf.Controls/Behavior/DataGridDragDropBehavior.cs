@@ -709,8 +709,20 @@ public static class DataGridDragDropBehavior
         if (row == null)
             row = s.HoverRow;
 
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop called, isInternalDrag={isInternalDrag}, row={row?.Item}");
-        handler(e.Data, row?.Item);
+        // 1列目選択モードの場合、1列目にドロップした場合のみ行のアイテムを渡す
+        // 2列目以降にドロップした場合はnullを渡す（現在のディレクトリにドロップ）
+        object? dropTargetItem = row?.Item;
+        var hitSource = e.OriginalSource as DependencyObject;
+        bool isOnPrimaryArea = BoxSelectBehavior.IsRowSelectionPrimaryArea(grid, hitSource);
+        if (!isOnPrimaryArea)
+        {
+            // 2列目以降にドロップした場合は、行のアイテムをnullにして現在のディレクトリにドロップ
+            dropTargetItem = null;
+            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop - Not on primary area, setting dropTargetItem to null");
+        }
+
+        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop called, isInternalDrag={isInternalDrag}, isOnPrimaryArea={isOnPrimaryArea}, dropTargetItem={dropTargetItem}");
+        handler(e.Data, dropTargetItem);
         
         // 内部のドラッグの場合のみ、既存のDropハンドラーが呼ばれないようにする
         // 外部からのドラッグ（DataFormats.FileDrop）の場合は、既存のListView_Dropも処理する
