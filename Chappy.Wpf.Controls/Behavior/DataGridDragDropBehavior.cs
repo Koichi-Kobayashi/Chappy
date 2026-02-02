@@ -46,6 +46,28 @@ public static class DataGridDragDropBehavior
     public static Action<IDataObject, object?>? GetDropHandler(DependencyObject d)
         => (Action<IDataObject, object?>?)d.GetValue(DropHandlerProperty);
 
+    // ドロップ完了後に呼び出されるコールバック（ホバー効果のクリアなどに使用）
+    public static readonly DependencyProperty OnDropCompleteProperty =
+        DependencyProperty.RegisterAttached(
+            "OnDropComplete",
+            typeof(Action),
+            typeof(DataGridDragDropBehavior));
+
+    public static void SetOnDropComplete(DependencyObject d, Action? v) => d.SetValue(OnDropCompleteProperty, v);
+    public static Action? GetOnDropComplete(DependencyObject d)
+        => (Action?)d.GetValue(OnDropCompleteProperty);
+
+    // ドラッグ元の行かどうかを示すフラグ（IsMouseOverホバー効果を無効にするために使用）
+    public static readonly DependencyProperty IsDraggingSourceProperty =
+        DependencyProperty.RegisterAttached(
+            "IsDraggingSource",
+            typeof(bool),
+            typeof(DataGridDragDropBehavior),
+            new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static void SetIsDraggingSource(DependencyObject d, bool v) => d.SetValue(IsDraggingSourceProperty, v);
+    public static bool GetIsDraggingSource(DependencyObject d) => (bool)d.GetValue(IsDraggingSourceProperty);
+
     #endregion
 
     #region State
@@ -361,7 +383,8 @@ public static class DataGridDragDropBehavior
             grid.SelectedItems.Add(item);
         }
         
-        // ドラッグ元の複数選択された行を取得してホバー状態にする
+        // ドラッグ元の行の参照を保持し、IsDraggingSourceフラグを設定
+        // これにより、XAMLでIsMouseOverホバー効果を無効にできる
         s.DraggedRows = new List<DataGridRow>();
         s.OriginalBackgroundLocalValues = new Dictionary<DataGridRow, object?>();
         
@@ -372,11 +395,10 @@ public static class DataGridDragDropBehavior
             {
                 s.DraggedRows.Add(row);
                 s.OriginalBackgroundLocalValues[row] = row.ReadLocalValue(Control.BackgroundProperty);
-                
-                // ホバー効果として背景色を変更（薄い青色）
-                var hoverBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x7A, 0xCC));
-                hoverBrush.Freeze();
-                row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
+                // ドラッグ元の行にIsDraggingSourceフラグを設定（IsMouseOverホバー効果を無効にするため）
+                SetIsDraggingSource(row, true);
+                // ドラッグ中はIsHitTestVisibleをFalseにしてIsMouseOverを無効化
+                row.IsHitTestVisible = false;
             }
         }
 
@@ -634,6 +656,11 @@ public static class DataGridDragDropBehavior
         {
             foreach (var row in s.DraggedRows)
             {
+                // IsDraggingSourceフラグをクリア
+                SetIsDraggingSource(row, false);
+                // IsHitTestVisibleを元に戻す
+                row.IsHitTestVisible = true;
+                
                 if (s.OriginalBackgroundLocalValues.TryGetValue(row, out var originalLocalValue))
                 {
                     if (ReferenceEquals(originalLocalValue, DependencyProperty.UnsetValue))
@@ -692,6 +719,10 @@ public static class DataGridDragDropBehavior
         }
 
         handler(e.Data, dropTargetItem);
+        
+        // ドロップ完了後のコールバックを呼び出す（ホバー効果のクリアなど）
+        var onDropComplete = GetOnDropComplete(grid);
+        onDropComplete?.Invoke();
         
         // 内部のドラッグの場合のみ、既存のDropハンドラーが呼ばれないようにする
         // 外部からのドラッグ（DataFormats.FileDrop）の場合は、既存のListView_Dropも処理する
