@@ -397,8 +397,8 @@ public static class DataGridDragDropBehavior
                 s.OriginalBackgroundLocalValues[row] = row.ReadLocalValue(Control.BackgroundProperty);
                 // ドラッグ元の行にIsDraggingSourceフラグを設定（IsMouseOverホバー効果を無効にするため）
                 SetIsDraggingSource(row, true);
-                // ドラッグ中はIsHitTestVisibleをFalseにしてIsMouseOverを無効化
-                row.IsHitTestVisible = false;
+                // 背景を透明に設定（行のハイライトを無効化）
+                row.SetValue(Control.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
             }
         }
 
@@ -617,10 +617,15 @@ public static class DataGridDragDropBehavior
             s.HoverRow = row;
             s.HoverOriginalBackgroundLocalValue = row.ReadLocalValue(Control.BackgroundProperty);
             
-            // ホバー効果として背景色を変更（薄い青色）
-            var hoverBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x7A, 0xCC));
-            hoverBrush.Freeze();
-            row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
+            // 1列目選択モードの場合、行全体のホバー効果は適用しない
+            // （ExplorerPage側で1列目のみハイライトを制御する）
+            if (!BoxSelectBehavior.GetIsRowSelectionFirstColumnOnly(grid))
+            {
+                // ホバー効果として背景色を変更（薄い青色）
+                var hoverBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x00, 0x7A, 0xCC));
+                hoverBrush.Freeze();
+                row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
+            }
         }
     }
 
@@ -658,8 +663,6 @@ public static class DataGridDragDropBehavior
             {
                 // IsDraggingSourceフラグをクリア
                 SetIsDraggingSource(row, false);
-                // IsHitTestVisibleを元に戻す
-                row.IsHitTestVisible = true;
                 
                 if (s.OriginalBackgroundLocalValues.TryGetValue(row, out var originalLocalValue))
                 {
