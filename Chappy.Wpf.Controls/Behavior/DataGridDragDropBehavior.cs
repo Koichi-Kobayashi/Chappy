@@ -158,7 +158,6 @@ public static class DataGridDragDropBehavior
         // ドラッグ中またはドラッグが完了していない場合は、SavedSelectedItemsを上書きしない
         if (s.IsDragging)
         {
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnMouseDown - Ignoring mouse down during drag");
             return;
         }
         
@@ -219,11 +218,6 @@ public static class DataGridDragDropBehavior
             {
                 s.SavedSelectedItems.Add(item);
             }
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnMouseDown - SelectedItems.Count = {grid.SelectedItems.Count}, SavedSelectedItems.Count = {s.SavedSelectedItems.Count}");
-        }
-        else
-        {
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnMouseDown - SavedSelectedItems already exists (restoration in progress), not overwriting. Count = {s.SavedSelectedItems.Count}");
         }
     }
 
@@ -330,7 +324,6 @@ public static class DataGridDragDropBehavior
         if (s.SavedSelectedItems != null && s.SavedSelectedItems.Count > 0)
         {
             items.AddRange(s.SavedSelectedItems);
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Using SavedSelectedItems ({items.Count} items)");
         }
         else if (grid.SelectedItems.Count > 0)
         {
@@ -339,16 +332,12 @@ public static class DataGridDragDropBehavior
             {
                 items.Add(item);
             }
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Using current SelectedItems ({items.Count} items)");
         }
         else if (s.DragRow?.Item != null)
         {
             // 選択されていない場合、ドラッグ開始した行のアイテムを使用
             items.Add(s.DragRow.Item);
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Using DragRow.Item (no selection)");
         }
-
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Final items.Count = {items.Count}");
         
         // ドラッグ開始フラグを設定
         s.IsDragging = true;
@@ -371,7 +360,6 @@ public static class DataGridDragDropBehavior
         {
             grid.SelectedItems.Add(item);
         }
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Set SelectedItems.Count = {grid.SelectedItems.Count}");
         
         // ドラッグ元の複数選択された行を取得してホバー状態にする
         s.DraggedRows = new List<DataGridRow>();
@@ -390,18 +378,11 @@ public static class DataGridDragDropBehavior
                 hoverBrush.Freeze();
                 row.SetCurrentValue(Control.BackgroundProperty, hoverBrush);
             }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Could not find row for item: {item}");
-            }
         }
-
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Found {s.DraggedRows.Count} rows to highlight");
 
         var build = GetBuildPayload(grid);
         if (build == null)
         {
-            System.Diagnostics.Debug.WriteLine("DataGridDragDropBehavior: BuildPayload is null");
             ClearDraggedRows(grid);
             return;
         }
@@ -409,15 +390,11 @@ public static class DataGridDragDropBehavior
         var data = build.Invoke(items);
         if (data == null)
         {
-            System.Diagnostics.Debug.WriteLine("DataGridDragDropBehavior: BuildPayload returned null");
             ClearDraggedRows(grid);
             return;
         }
 
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Starting drag with {items.Count} item(s)");
         var dragResult = DragDrop.DoDragDrop(grid, data, DragDropEffects.Move | DragDropEffects.Copy);
-        
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: DragDrop completed with result: {dragResult}");
         
         // ドラッグ元の行のホバー効果をクリア
         ClearDraggedRows(grid);
@@ -430,7 +407,6 @@ public static class DataGridDragDropBehavior
         {
             // 選択状態を保存（非同期処理で使用するため）
             var savedItems = new List<object>(s.SavedSelectedItems);
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Drag cancelled, restoring {savedItems.Count} selected items");
             
             // 選択状態を復元（非同期で実行して、他のイベントハンドラが実行された後に確実に復元）
             grid.Dispatcher.BeginInvoke(new System.Action(() =>
@@ -438,17 +414,14 @@ public static class DataGridDragDropBehavior
                 try
                 {
                     var state = GetState(grid);
-                    System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Restoring selection, savedItems.Count = {savedItems.Count}");
                     grid.SelectedItems.Clear();
                     foreach (var item in savedItems)
                     {
                         if (item != null)
                         {
                             grid.SelectedItems.Add(item);
-                            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Added item to selection: {item}");
                         }
                     }
-                    System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Restored selection, SelectedItems.Count = {grid.SelectedItems.Count}");
                     
                     // フォーカスを復元
                     if (!grid.IsFocused)
@@ -460,9 +433,8 @@ public static class DataGridDragDropBehavior
                     state.IsDragging = false;
                     state.SavedSelectedItems = null;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: Error restoring selection: {ex.Message}");
                     var state = GetState(grid);
                     state.IsDragging = false;
                     state.SavedSelectedItems = null;
@@ -694,7 +666,6 @@ public static class DataGridDragDropBehavior
         var handler = GetDropHandler(grid);
         if (handler == null)
         {
-            System.Diagnostics.Debug.WriteLine("DataGridDragDropBehavior: DropHandler is null");
             return;
         }
 
@@ -718,10 +689,8 @@ public static class DataGridDragDropBehavior
         {
             // 2列目以降にドロップした場合は、行のアイテムをnullにして現在のディレクトリにドロップ
             dropTargetItem = null;
-            System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop - Not on primary area, setting dropTargetItem to null");
         }
 
-        System.Diagnostics.Debug.WriteLine($"DataGridDragDropBehavior: OnDrop called, isInternalDrag={isInternalDrag}, isOnPrimaryArea={isOnPrimaryArea}, dropTargetItem={dropTargetItem}");
         handler(e.Data, dropTargetItem);
         
         // 内部のドラッグの場合のみ、既存のDropハンドラーが呼ばれないようにする
