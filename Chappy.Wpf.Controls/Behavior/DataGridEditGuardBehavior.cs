@@ -48,6 +48,7 @@ public static class DataGridEditGuardBehavior
         public bool SuppressMouseEditOnce;  // マウスの編集開始を 1 回だけ抑止するフラグ
         public bool SuppressRenameOnce;     // 次の MouseUp で予約しない
         public int? SelectionAnchor;       // Shift選択のアンカー位置
+        public bool RestoreFocusAfterEnter; // Enter確定後にフォーカス復帰を保証
     }
 
     private static readonly DependencyProperty StateProperty =
@@ -111,6 +112,17 @@ public static class DataGridEditGuardBehavior
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
         var s = GetState(grid);
+        var src = e.OriginalSource as DependencyObject;
+        var tb = src as TextBox ?? VirtualTreeUtil.FindAncestor<TextBox>(src)
+                 ?? FindCurrentEditingTextBox(grid);
+
+        // フラグが落ちていても、実際にリネームTextBox上なら編集中として扱う
+        if (!s.IsRenaming &&
+            tb != null &&
+            (tb.IsKeyboardFocused || tb.IsFocused || string.Equals(tb.Name, "FileNameTextBox", StringComparison.Ordinal)))
+        {
+            s.IsRenaming = true;
+        }
 
         if (!s.IsRenaming)
         {
@@ -125,9 +137,6 @@ public static class DataGridEditGuardBehavior
         // ===== 編集中 =====
 
         // ★TextBoxの削除を自前で実行
-        var src = e.OriginalSource as DependencyObject;
-        var tb = src as TextBox ?? VirtualTreeUtil.FindAncestor<TextBox>(src)
-                 ?? FindCurrentEditingTextBox(grid);
         bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
 
         if (!shift && e.Key != Key.Left && e.Key != Key.Right && e.Key != Key.Home && e.Key != Key.End)
@@ -137,7 +146,17 @@ public static class DataGridEditGuardBehavior
 
         if (e.Key == Key.Enter)
         {
+            s.RestoreFocusAfterEnter = true;
             CommitEdit(grid);
+            RestoreNavigationFocus(grid);
+            grid.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RestoreNavigationFocus(grid);
+            }), DispatcherPriority.Send);
+            grid.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RestoreNavigationFocus(grid);
+            }), DispatcherPriority.Loaded);
             e.Handled = true;
             return;
         }
@@ -171,6 +190,11 @@ public static class DataGridEditGuardBehavior
         // ←→ / Home / End
         if (e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Home || e.Key == Key.End)
         {
+            if (tb == null)
+            {
+                return;
+            }
+
             e.Handled = true;
 
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
@@ -586,6 +610,7 @@ public static class DataGridEditGuardBehavior
     private static void OnLostFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        var s = GetState(grid);
 
         // フォーカスが DataGrid 内（例：DataGrid→TextBox）へ移動しただけなら閉じない
         if (e.NewFocus is DependencyObject nf && IsDescendantOf(nf, grid))
@@ -593,6 +618,14 @@ public static class DataGridEditGuardBehavior
 
         // 本当にグリッド外へ出た時だけ確定
         CommitEdit(grid);
+        if (s.RestoreFocusAfterEnter)
+        {
+            s.RestoreFocusAfterEnter = false;
+            grid.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RestoreNavigationFocus(grid);
+            }), DispatcherPriority.Send);
+        }
     }
 
     private static void CommitEdit(System.Windows.Controls.DataGrid grid)
@@ -608,6 +641,65 @@ public static class DataGridEditGuardBehavior
         grid.CommitEdit(DataGridEditingUnit.Cell, true);
         grid.CommitEdit(DataGridEditingUnit.Row, true);
         s.IsRenaming = false;
+    }
+
+    private static void RestoreNavigationFocus(System.Windows.Controls.DataGrid grid)
+    {
+        try
+        {
+            var selectedItem = grid.SelectedItem ?? grid.CurrentCell.Item;
+            if (selectedItem == null)
+            {
+                grid.Focus();
+                Keyboard.Focus(grid);
+                return;
+            }
+
+            DataGridColumn? nameColumn = null;
+            foreach (DataGridColumn column in grid.Columns)
+            {
+                if (column.DisplayIndex == 0)
+                {
+                    nameColumn = column;
+                    break;
+                }
+            }
+            if (nameColumn != null)
+            {
+                grid.CurrentCell = new DataGridCellInfo(selectedItem, nameColumn);
+            }
+
+            grid.SelectedItem = selectedItem;
+            grid.ScrollIntoView(selectedItem, nameColumn);
+            grid.UpdateLayout();
+
+            var row = grid.ItemContainerGenerator.ContainerFromItem(selectedItem) as DataGridRow;
+            if (row != null)
+            {
+                row.IsSelected = true;
+                row.ApplyTemplate();
+            }
+
+            if (row != null)
+            {
+                var cell = VirtualTreeUtil.FindDescendant<DataGridCell>(row);
+                if (cell != null)
+                {
+                    cell.Focusable = true;
+                    cell.Focus();
+                    Keyboard.Focus(cell);
+                    return;
+                }
+            }
+
+            grid.Focus();
+            Keyboard.Focus(grid);
+        }
+        catch
+        {
+            grid.Focus();
+            Keyboard.Focus(grid);
+        }
     }
 
     private static void OnPreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
