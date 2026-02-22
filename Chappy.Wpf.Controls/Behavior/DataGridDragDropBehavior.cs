@@ -135,7 +135,7 @@ public static class DataGridDragDropBehavior
         {
             if (s_inputHookRefCount++ == 0)
                 InputManager.Current.PreProcessInput += s_preProcessInputHandler;
-            grid.PreviewMouseLeftButtonDown += OnMouseDown;
+            grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, (MouseButtonEventHandler)OnMouseDown, handledEventsToo: true);
             grid.PreviewMouseLeftButtonUp += OnMouseUp;
             grid.PreviewMouseRightButtonDown += OnRightMouseDown;
             grid.PreviewMouseMove += OnMouseMove;
@@ -148,7 +148,7 @@ public static class DataGridDragDropBehavior
         }
         else
         {
-            grid.PreviewMouseLeftButtonDown -= OnMouseDown;
+            grid.RemoveHandler(UIElement.PreviewMouseLeftButtonDownEvent, (MouseButtonEventHandler)OnMouseDown);
             grid.PreviewMouseLeftButtonUp -= OnMouseUp;
             grid.PreviewMouseRightButtonDown -= OnRightMouseDown;
             grid.PreviewMouseMove -= OnMouseMove;
@@ -200,8 +200,9 @@ public static class DataGridDragDropBehavior
 
         if (s.StartedOnRightEmptyArea)
         {
-            // 右側余白からは D&D を始めない
+            // 右側余白・2列目以降からは D&D を始めない（SavedSelectedItemsも保存しない）
             s.DragRow = null;
+            s.SavedSelectedItems = null;
         }
 
         // ===== Explorer 互換：複数選択中の「選択済み行」マウスダウンでは選択を単一化しない =====

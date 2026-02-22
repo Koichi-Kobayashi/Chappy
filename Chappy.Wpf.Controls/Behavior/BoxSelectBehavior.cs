@@ -72,14 +72,14 @@ public static class BoxSelectBehavior
 
         if ((bool)e.NewValue)
         {
-            grid.PreviewMouseLeftButtonDown += OnDown;
+            grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, (MouseButtonEventHandler)OnDown, handledEventsToo: true);
             grid.PreviewMouseMove += OnMove;
             grid.PreviewMouseLeftButtonUp += OnUp;
             grid.MouseLeave += OnLeave;
         }
         else
         {
-            grid.PreviewMouseLeftButtonDown -= OnDown;
+            grid.RemoveHandler(UIElement.PreviewMouseLeftButtonDownEvent, (MouseButtonEventHandler)OnDown);
             grid.PreviewMouseMove -= OnMove;
             grid.PreviewMouseLeftButtonUp -= OnUp;
             grid.MouseLeave -= OnLeave;
