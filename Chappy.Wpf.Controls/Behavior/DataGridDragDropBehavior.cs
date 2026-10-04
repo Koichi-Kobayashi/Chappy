@@ -689,9 +689,11 @@ public static class DataGridDragDropBehavior
     private static void OnDrop(object sender, DragEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        if (e.Handled) return;
 
         // ホバー効果をクリア
         ClearHoverRow(grid);
+        ClearHoverCandidate(grid);
         ClearDraggedRows(grid);
 
         var handler = GetDropHandler(grid);
@@ -700,16 +702,12 @@ public static class DataGridDragDropBehavior
             return;
         }
 
-        // 内部のドラッグ（DataGridから開始されたドラッグ）かどうかをチェック
-        // BuildPayloadで作成されたデータ形式をチェック
-        bool isInternalDrag = e.Data.GetDataPresent("FileSystemItem") || 
-                              e.Data.GetDataPresent("FileSystemItems");
-        
+        // delegate に渡したドロップは、この Behavior が処理を所有する。
+        // 外部 FileDrop も後続の Drop ハンドラーで二重処理させない。
+        e.Handled = true;
+
         var pos = e.GetPosition(grid);
         var row = GetRowFromPoint(grid, pos);
-        var s = GetState(grid);
-        if (row == null)
-            row = s.HoverRow;
 
         // 1列目選択モードの場合、1列目にドロップした場合のみ行のアイテムを渡す
         // 2列目以降にドロップした場合はnullを渡す（現在のディレクトリにドロップ）
@@ -727,13 +725,7 @@ public static class DataGridDragDropBehavior
         // ドロップ完了後のコールバックを呼び出す（ホバー効果のクリアなど）
         var onDropComplete = GetOnDropComplete(grid);
         onDropComplete?.Invoke();
-        
-        // 内部のドラッグの場合のみ、既存のDropハンドラーが呼ばれないようにする
-        // 外部からのドラッグ（DataFormats.FileDrop）の場合は、既存のListView_Dropも処理する
-        if (isInternalDrag)
-        {
-            e.Handled = true;
-        }
+
     }
 
     #endregion
