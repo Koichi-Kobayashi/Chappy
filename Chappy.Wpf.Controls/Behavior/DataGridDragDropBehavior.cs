@@ -169,6 +169,11 @@ public static class DataGridDragDropBehavior
     private static void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        HandleMouseDown(grid, e, e.GetPosition(grid));
+    }
+
+    private static void HandleMouseDown(System.Windows.Controls.DataGrid grid, MouseButtonEventArgs e, Point pos)
+    {
 
         var s = GetState(grid);
 
@@ -184,7 +189,7 @@ public static class DataGridDragDropBehavior
         }
         
         s.IsDragging = false;
-        s.MouseDownPos = e.GetPosition(grid);
+        s.MouseDownPos = pos;
         s.MouseDownTimestamp = Stopwatch.GetTimestamp();
 
         s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
@@ -232,16 +237,12 @@ public static class DataGridDragDropBehavior
                 grid.CurrentCell = new DataGridCellInfo(s.DragRow.Item, grid.Columns[0]);
         }
 
-        // マウスダウン時の選択されたアイテムを保存（BoxSelectBehaviorが選択を変更する前に）
-        // ただし、SavedSelectedItemsが既に存在する場合は上書きしない（選択状態の復元処理中の場合）
-        if (s.SavedSelectedItems == null)
-        {
-            s.SavedSelectedItems = new List<object>();
-            foreach (var item in grid.SelectedItems)
-            {
-                s.SavedSelectedItems.Add(item);
-            }
-        }
+        // 毎回今回の行から保存し直す。未選択行のクリックは既定の選択処理より先に届く。
+        s.SavedSelectedItems = s.DragRow == null || Keyboard.Modifiers != ModifierKeys.None
+            ? null
+            : grid.SelectedItems.Contains(s.DragRow.Item)
+                ? grid.SelectedItems.Cast<object>().ToList()
+                : new List<object> { s.DragRow.Item };
     }
 
     /// <summary>
@@ -317,25 +318,39 @@ public static class DataGridDragDropBehavior
             s.ClickedSelectedItem = null;
             s.StartedOnRightEmptyArea = false;
             if (e.ChangedButton == MouseButton.Left)
+            {
                 s.SuppressDragUntilLeftUp = false;
+                if (!s.IsDragging)
+                {
+                    s.SavedSelectedItems = null;
+                    s.DragRow = null;
+                }
+            }
         }
     }
 
     private static void OnMouseMove(object sender, MouseEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
-        if (e.LeftButton != MouseButtonState.Pressed) return;
+        HandleMouseMove(grid, e, e.LeftButton, e.GetPosition(grid));
+    }
+
+    private static void HandleMouseMove(System.Windows.Controls.DataGrid grid, MouseEventArgs e, MouseButtonState leftButton, Point pos)
+    {
+        if (leftButton != MouseButtonState.Pressed) return;
 
         var s = GetState(grid);
         if (s.SuppressDragUntilLeftUp) return;
         if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
 
+        // D&D開始前の遅延中も、DataGridの通常の押下ドラッグ選択を発生させない。
+        e.Handled = true;
+
         const int dragStartDelayMs = 500;  // 0.5秒間ドラッグ開始を遅延させる（誤ドラッグ防止）
         var elapsedSinceMouseDownMs = (Stopwatch.GetTimestamp() - s.MouseDownTimestamp) * 1000.0 / Stopwatch.Frequency;
         if (elapsedSinceMouseDownMs < dragStartDelayMs) return;
 
-        var pos = e.GetPosition(grid);
         if (Math.Abs(pos.X - s.MouseDownPos.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - s.MouseDownPos.Y) < SystemParameters.MinimumVerticalDragDistance)
             return;
@@ -407,6 +422,8 @@ public static class DataGridDragDropBehavior
         if (build == null)
         {
             ClearDraggedRows(grid);
+            s.IsDragging = false;
+            s.SavedSelectedItems = null;
             return;
         }
         
@@ -414,16 +431,29 @@ public static class DataGridDragDropBehavior
         if (data == null)
         {
             ClearDraggedRows(grid);
+            s.IsDragging = false;
+            s.SavedSelectedItems = null;
             return;
         }
 
-        var dragResult = DragDrop.DoDragDrop(grid, data, DragDropEffects.Move | DragDropEffects.Copy);
-        
-        // ドラッグ元の行のホバー効果をクリア
-        ClearDraggedRows(grid);
-        
-        // ドラッグ操作完了後に矩形選択をクリア
-        BoxSelectBehavior.ClearSelection(grid);
+        DragDropEffects dragResult;
+        try
+        {
+            dragResult = DragDrop.DoDragDrop(grid, data, DragDropEffects.Move | DragDropEffects.Copy);
+        }
+        catch
+        {
+            s.IsDragging = false;
+            s.SavedSelectedItems = null;
+            throw;
+        }
+        finally
+        {
+            ClearDraggedRows(grid);
+            BoxSelectBehavior.ClearSelection(grid);
+            // 外部へのドロップやキャンセルでも、ドラッグ元の表示を後始末する。
+            GetOnDropComplete(grid)?.Invoke();
+        }
         
         // ドラッグがキャンセルされた場合（DragDropEffects.None）、選択状態を復元（OS標準のエクスプローラーと同じ動作）
         if (dragResult == DragDropEffects.None && s.SavedSelectedItems != null && s.SavedSelectedItems.Count > 0)
