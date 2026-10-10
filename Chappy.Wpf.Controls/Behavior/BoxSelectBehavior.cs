@@ -89,34 +89,32 @@ public static class BoxSelectBehavior
     private static void OnDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        HandleMouseDown(grid, e, e.GetPosition(grid));
+    }
 
-        // スクロールバー上の操作（Thumb/Track/RepeatButton 等）では矩形選択を開始しない。
-        // また、この場合に「余白クリック扱い」で選択解除もしない。
-        if (VirtualTreeUtil.FindAncestor<ScrollBar>(e.OriginalSource as DependencyObject) != null)
-            return;
-
-        var pos = e.GetPosition(grid);
+    private static void HandleMouseDown(System.Windows.Controls.DataGrid grid, MouseButtonEventArgs e, Point pos)
+    {
+        ClearSelection(grid); // 前回の未開始ドラッグの候補も引き継がない。
         bool onRow = VirtualTreeUtil.FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject) != null;
-        bool rightEmptyArea = IsRightEmptyArea(grid, pos);
         bool firstColumnOnly = GetIsRowSelectionFirstColumnOnly(grid);
         bool primarySelectArea = !firstColumnOnly || IsRowSelectionPrimaryArea(grid, e.OriginalSource as DependencyObject);
-        bool treatAsEmptyArea = rightEmptyArea || (firstColumnOnly && onRow && !primarySelectArea);
-
-        // 行上で、かつ右側余白ではないなら通常処理（行上からのドラッグは D&D を優先）
-        if (onRow && !treatAsEmptyArea)
+        if (BoxSelectionHitTest.IsInteractiveSource(e.OriginalSource as DependencyObject)) return;
+        if (onRow && firstColumnOnly && !primarySelectArea)
+        {
+            // 先頭列のみ選択する既存設定は維持するが、文字のあるセルから矩形選択は開始しない。
+            e.Handled = true;
             return;
+        }
+        if (e.ClickCount != 1 || !BoxSelectionHitTest.IsEmptyArea(grid, e.OriginalSource as DependencyObject, pos)) return;
 
         var s = GetState(grid);
         s.DragStart = pos;
         s.IsDragging = false;
-        s.StartedOnRightEmptyArea = treatAsEmptyArea;
+        s.StartedOnRightEmptyArea = true;
 
         // 余白をクリックした場合は選択を解除
         grid.SelectedItems.Clear();
 
-        // 先頭列以外を余白扱いにする場合は既定のセル選択を抑止
-        if (firstColumnOnly && onRow && !primarySelectArea)
-            e.Handled = true;
     }
 
     private static void OnMove(object sender, MouseEventArgs e)
@@ -236,15 +234,6 @@ public static class BoxSelectBehavior
         s.StartedOnRightEmptyArea = false;
         s.Layer = null;
         s.Adorner = null;
-    }
-
-    private static bool IsRightEmptyArea(System.Windows.Controls.DataGrid grid, Point pos)
-    {
-        double columnsWidth = grid.Columns
-            .Where(c => c.Visibility == Visibility.Visible)
-            .Sum(c => c.ActualWidth);
-
-        return pos.X > columnsWidth;
     }
 
     /// <summary>
