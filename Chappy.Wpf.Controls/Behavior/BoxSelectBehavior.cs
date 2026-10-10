@@ -101,11 +101,10 @@ public static class BoxSelectBehavior
         if (BoxSelectionHitTest.IsInteractiveSource(e.OriginalSource as DependencyObject)) return;
         if (onRow && firstColumnOnly && !primarySelectArea)
         {
-            // 先頭列のみ選択する既存設定は維持するが、文字のあるセルから矩形選択は開始しない。
+            // 名前列以外では通常の行選択やファイルD&Dを開始させない。
             e.Handled = true;
-            return;
         }
-        if (e.ClickCount != 1 || !BoxSelectionHitTest.IsEmptyArea(grid, e.OriginalSource as DependencyObject, pos)) return;
+        if (e.ClickCount != 1 || !BoxSelectionHitTest.IsSelectionArea(grid, e.OriginalSource as DependencyObject, pos)) return;
 
         var s = GetState(grid);
         s.DragStart = pos;
@@ -120,14 +119,18 @@ public static class BoxSelectBehavior
     private static void OnMove(object sender, MouseEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+        HandleMouseMove(grid, e, e.GetPosition(grid));
+    }
+
+    private static void HandleMouseMove(System.Windows.Controls.DataGrid grid, MouseEventArgs e, Point pos)
+    {
         var s = GetState(grid);
-        if (s.DragStart == null || e.LeftButton != MouseButtonState.Pressed) return;
+        if (s.DragStart == null) return;
 
         // イベントが既に処理済みの場合は何もしない（DataGridDragDropBehaviorがドラッグを開始した場合）
         if (e.Handled) return;
 
-        var pos = e.GetPosition(grid);
-        
         // ドラッグ開始前のチェック：行上で開始された場合は矩形選択を無効化
         if (!s.IsDragging)
         {
