@@ -21,6 +21,18 @@ namespace Chappy.Wpf.Controls.ColorPicker;
 [TemplatePart(Name = PartPaletteItems, Type = typeof(ItemsControl))]
 public partial class ColorPicker : Control
 {
+    /// <summary>色の数値・コード入力欄の背景。</summary>
+    public static readonly DependencyProperty InputBackgroundProperty = DependencyProperty.Register(
+        nameof(InputBackground), typeof(Brush), typeof(ColorPicker),
+        new FrameworkPropertyMetadata(SystemColors.WindowBrush));
+
+    /// <summary>色の数値・コード入力欄の背景。ホストアプリのテーマに合わせて設定できます。</summary>
+    public Brush InputBackground
+    {
+        get => (Brush)GetValue(InputBackgroundProperty);
+        set => SetValue(InputBackgroundProperty, value);
+    }
+
     /// <summary>スペクトラム画像のテンプレートパート名</summary>
     private const string PartSpectrumImage = "PART_SpectrumImage";
     /// <summary>スペクトラムキャンバスのテンプレートパート名</summary>
