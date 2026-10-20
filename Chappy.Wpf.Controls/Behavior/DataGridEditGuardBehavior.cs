@@ -12,6 +12,17 @@ namespace Chappy.Wpf.Controls.Behaviors;
 
 public static class DataGridEditGuardBehavior
 {
+    // Hosts with their own click/drag state machine can keep the keyboard and
+    // commit guard without running a second delayed-rename timer.
+    public static readonly DependencyProperty IsDelayedRenameEnabledProperty =
+        DependencyProperty.RegisterAttached("IsDelayedRenameEnabled", typeof(bool),
+            typeof(DataGridEditGuardBehavior), new PropertyMetadata(true));
+
+    public static void SetIsDelayedRenameEnabled(DependencyObject d, bool value)
+        => d.SetValue(IsDelayedRenameEnabledProperty, value);
+    public static bool GetIsDelayedRenameEnabled(DependencyObject d)
+        => (bool)d.GetValue(IsDelayedRenameEnabledProperty);
+
     public static readonly DependencyProperty IsEnabledProperty =
         DependencyProperty.RegisterAttached(
             "IsEnabled",
@@ -45,7 +56,6 @@ public static class DataGridEditGuardBehavior
         public object? PendingItem;
         public Point DownPos;
         public bool SuppressCommitOnce;     // 次のフォーカス喪失時の CommitEdit を抑制
-        public bool SuppressMouseEditOnce;  // マウスの編集開始を 1 回だけ抑止するフラグ
         public bool SuppressRenameOnce;     // 次の MouseUp で予約しない
         public int? SelectionAnchor;       // Shift選択のアンカー位置
         public bool RestoreFocusAfterEnter; // Enter確定後にフォーカス復帰を保証
@@ -453,6 +463,7 @@ public static class DataGridEditGuardBehavior
     private static void OnMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        if (!GetIsDelayedRenameEnabled(grid)) return;
         var s = GetState(grid);
 
         // ★ ダブルクリックなら「予約は作らない」＆既存予約も潰す
@@ -478,6 +489,7 @@ public static class DataGridEditGuardBehavior
     private static void OnMouseUp(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
+        if (!GetIsDelayedRenameEnabled(grid)) return;
         var s = GetState(grid);
 
         // ★ ダブルクリック or 抑止フラグなら予約しない（ここが最重要）
@@ -579,9 +591,6 @@ public static class DataGridEditGuardBehavior
 
         s.IsRenaming = false;
 
-        // 次に来る BeginningEdit を 1 回だけ抑止
-        s.SuppressMouseEditOnce = true;
-
         // ダブルクリック直後の MouseUp で予約させない
         s.SuppressRenameOnce = true;
     }
@@ -592,14 +601,11 @@ public static class DataGridEditGuardBehavior
     private static void OnBeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
-        var s = GetState(grid);
-
-        // 直前のダブルクリックから来た BeginEdit は必ずキャンセル
-        if (s.SuppressMouseEditOnce)
+        // Mouse input must never edit a file name. A double click that did not
+        // trigger BeginEdit must not leave a flag that consumes the next F2.
+        if (e.EditingEventArgs is MouseButtonEventArgs)
         {
             e.Cancel = true;
-            s.SuppressMouseEditOnce = false;
-            return;
         }
     }
 
