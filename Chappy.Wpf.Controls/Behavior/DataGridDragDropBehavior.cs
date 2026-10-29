@@ -75,7 +75,6 @@ public static class DataGridDragDropBehavior
     private sealed class State
     {
         public Point MouseDownPos;
-        public long MouseDownTimestamp;
         public bool IsDragging;
         public bool CancelDragRequested;
         public bool SuppressDragUntilLeftUp;
@@ -111,6 +110,9 @@ public static class DataGridDragDropBehavior
     private static int s_inputHookRefCount;
     private static long s_lastRightButtonDownTimestamp;
     private static readonly PreProcessInputEventHandler s_preProcessInputHandler = OnPreProcessInput;
+    // Track only the current press, including moves routed to another pane.
+    // Do not capture: DataGrid selection and BoxSelectBehavior own their captures.
+    private static WeakReference<System.Windows.Controls.DataGrid>? s_pendingDragGrid;
 
     private static State GetState(System.Windows.Controls.DataGrid g)
     {
@@ -139,6 +141,7 @@ public static class DataGridDragDropBehavior
             grid.PreviewMouseLeftButtonUp += OnMouseUp;
             grid.PreviewMouseRightButtonDown += OnRightMouseDown;
             grid.PreviewMouseMove += OnMouseMove;
+            grid.Unloaded += OnUnloaded;
             grid.QueryContinueDrag += OnQueryContinueDrag;
             grid.DragEnter += OnDragEnter;
             grid.DragOver += OnDragOver;
@@ -152,6 +155,8 @@ public static class DataGridDragDropBehavior
             grid.PreviewMouseLeftButtonUp -= OnMouseUp;
             grid.PreviewMouseRightButtonDown -= OnRightMouseDown;
             grid.PreviewMouseMove -= OnMouseMove;
+            grid.Unloaded -= OnUnloaded;
+            ClearPendingDrag(grid);
             grid.QueryContinueDrag -= OnQueryContinueDrag;
             grid.DragEnter -= OnDragEnter;
             grid.DragOver -= OnDragOver;
@@ -190,7 +195,7 @@ public static class DataGridDragDropBehavior
         
         s.IsDragging = false;
         s.MouseDownPos = pos;
-        s.MouseDownTimestamp = Stopwatch.GetTimestamp();
+        s_pendingDragGrid = null;
 
         s.DragRow = VirtualTreeUtil.FindAncestor<DataGridRow>(
             e.OriginalSource as DependencyObject);
@@ -243,6 +248,19 @@ public static class DataGridDragDropBehavior
             : grid.SelectedItems.Contains(s.DragRow.Item)
                 ? grid.SelectedItems.Cast<object>().ToList()
                 : new List<object> { s.DragRow.Item };
+        if (s.DragRow != null)
+            s_pendingDragGrid = new WeakReference<System.Windows.Controls.DataGrid>(grid);
+    }
+
+    private static void ClearPendingDrag(System.Windows.Controls.DataGrid grid)
+    {
+        if (s_pendingDragGrid != null && s_pendingDragGrid.TryGetTarget(out var pending) && pending == grid)
+            s_pendingDragGrid = null;
+    }
+
+    private static void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.DataGrid grid) ClearPendingDrag(grid);
     }
 
     /// <summary>
@@ -289,6 +307,7 @@ public static class DataGridDragDropBehavior
     {
         if (sender is not System.Windows.Controls.DataGrid grid) return;
         var s = GetState(grid);
+        ClearPendingDrag(grid);
 
         // ドラッグに発展しなかった「クリック確定」時だけ単一選択に落とす（Explorer と同じ）
         if (!s.IsDragging && s.SuppressSelectionOnMouseDown && s.ClickedSelectedItem != null)
@@ -338,24 +357,22 @@ public static class DataGridDragDropBehavior
     private static void HandleMouseMove(System.Windows.Controls.DataGrid grid, MouseEventArgs e, MouseButtonState leftButton, Point pos)
     {
         if (leftButton != MouseButtonState.Pressed) return;
+        if (s_pendingDragGrid == null || !s_pendingDragGrid.TryGetTarget(out var pending) || pending != grid) return;
 
         var s = GetState(grid);
         if (s.SuppressDragUntilLeftUp) return;
         if (s.StartedOnRightEmptyArea) return; // 右側余白からは矩形選択を優先
         if (s.IsDragging || s.DragRow == null) return;
 
-        // D&D開始前の遅延中も、DataGridの通常の押下ドラッグ選択を発生させない。
+        // 閾値未満でも、DataGridの通常の押下ドラッグ選択を発生させない。
         e.Handled = true;
-
-        const int dragStartDelayMs = 500;  // 0.5秒間ドラッグ開始を遅延させる（誤ドラッグ防止）
-        var elapsedSinceMouseDownMs = (Stopwatch.GetTimestamp() - s.MouseDownTimestamp) * 1000.0 / Stopwatch.Frequency;
-        if (elapsedSinceMouseDownMs < dragStartDelayMs) return;
 
         if (Math.Abs(pos.X - s.MouseDownPos.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - s.MouseDownPos.Y) < SystemParameters.MinimumVerticalDragDistance)
             return;
 
         // ==== ドラッグ開始 ====
+        ClearPendingDrag(grid); // Consume once, before payload callbacks or OLE's nested input loop.
         // まず、BoxSelectBehaviorが選択を変更する前に、選択状態を確実に保存
         // 保存された選択がある場合はそれを使用（OnMouseDownで保存済み）
         var items = new List<object>();
@@ -556,12 +573,30 @@ public static class DataGridDragDropBehavior
 
     private static void OnPreProcessInput(object sender, PreProcessInputEventArgs e)
     {
+        if (e.StagingItem.Input is MouseEventArgs mouse && mouse.RoutedEvent == Mouse.PreviewMouseMoveEvent)
+            HandlePendingMouseMove(mouse, mouse.LeftButton);
+        if (e.StagingItem.Input is MouseButtonEventArgs button &&
+            button.ChangedButton == MouseButton.Left &&
+            (button.RoutedEvent == Mouse.PreviewMouseUpEvent || button.RoutedEvent == Mouse.PreviewMouseDownEvent))
+            s_pendingDragGrid = null;
         if (e.StagingItem.Input is MouseButtonEventArgs mbe &&
             mbe.ChangedButton == MouseButton.Right &&
             mbe.ButtonState == MouseButtonState.Pressed)
         {
             s_lastRightButtonDownTimestamp = Stopwatch.GetTimestamp();
+            s_pendingDragGrid = null;
         }
+    }
+
+    private static void HandlePendingMouseMove(MouseEventArgs e, MouseButtonState leftButton)
+    {
+        if (s_pendingDragGrid == null || !s_pendingDragGrid.TryGetTarget(out var grid)) return;
+        if (leftButton != MouseButtonState.Pressed || !grid.IsVisible || !grid.IsEnabled)
+        {
+            ClearPendingDrag(grid);
+            return;
+        }
+        HandleMouseMove(grid, e, leftButton, e.GetPosition(grid));
     }
 
     #endregion
