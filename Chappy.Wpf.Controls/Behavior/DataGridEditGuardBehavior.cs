@@ -120,6 +120,9 @@ public static class DataGridEditGuardBehavior
 
     private static void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // A host may own asynchronous commits. Never commit/focus a second time
+        // after an ancestor has consumed the key for that transaction.
+        if (e.Handled) return;
         if (sender is not System.Windows.Controls.DataGrid grid) return;
         var s = GetState(grid);
         var src = e.OriginalSource as DependencyObject;
