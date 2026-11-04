@@ -40,6 +40,15 @@ public static class BoxSelectBehavior
     public static bool GetIsRowSelectionFirstColumnOnly(DependencyObject d)
         => (bool)d.GetValue(IsRowSelectionFirstColumnOnlyProperty);
 
+    // Hosts providing row-click selection can preserve it until a rectangle starts.
+    public static readonly DependencyProperty DeferRowSelectionClearProperty =
+        DependencyProperty.RegisterAttached("DeferRowSelectionClear", typeof(bool),
+            typeof(BoxSelectBehavior), new PropertyMetadata(false));
+    public static void SetDeferRowSelectionClear(DependencyObject d, bool value)
+        => d.SetValue(DeferRowSelectionClearProperty, value);
+    public static bool GetDeferRowSelectionClear(DependencyObject d)
+        => (bool)d.GetValue(DeferRowSelectionClearProperty);
+
     private sealed class State
     {
         public Point? DragStart;
@@ -111,8 +120,9 @@ public static class BoxSelectBehavior
         s.IsDragging = false;
         s.StartedOnRightEmptyArea = true;
 
-        // 余白をクリックした場合は選択を解除
-        grid.SelectedItems.Clear();
+        // Row clicks are completed by the host; UpdateSelection replaces the
+        // selection if this candidate actually becomes a rectangle drag.
+        if (!onRow || !GetDeferRowSelectionClear(grid)) grid.SelectedItems.Clear();
 
     }
 
